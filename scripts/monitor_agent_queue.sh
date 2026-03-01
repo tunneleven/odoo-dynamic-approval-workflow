@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Force plain output; avoid interactive pager (less) opening blank/fullscreen views.
+export GH_PAGER=cat
+export PAGER=cat
+export LESS=
+
 REPO=""
 AGENT="codex"
 ASSIGNEE=""
@@ -21,25 +26,40 @@ Options:
 EOF
 }
 
+require_value() {
+  local flag="$1"
+  local value="${2:-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    echo "Missing value for $flag" >&2
+    usage
+    exit 2
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)
+      require_value "$1" "${2:-}"
       REPO="$2"
       shift 2
       ;;
     --agent)
+      require_value "$1" "${2:-}"
       AGENT="$2"
       shift 2
       ;;
     --assignee)
+      require_value "$1" "${2:-}"
       ASSIGNEE="$2"
       shift 2
       ;;
     --watch)
+      require_value "$1" "${2:-}"
       WATCH_SECONDS="$2"
       shift 2
       ;;
     --limit)
+      require_value "$1" "${2:-}"
       LIMIT="$2"
       shift 2
       ;;
@@ -98,6 +118,7 @@ print_runs() {
     --json databaseId,status,conclusion,createdAt,displayTitle,url \
     --template '{{range .}}#{{.databaseId}} {{.status}}/{{.conclusion}} {{.createdAt}} {{.displayTitle}}{{"\n"}}{{.url}}{{"\n\n"}}{{end}}' 2>/dev/null; then
     echo "Workflow not found or no access yet."
+    echo "Hint: this usually means the workflow file is not on the default branch yet."
   fi
 }
 
