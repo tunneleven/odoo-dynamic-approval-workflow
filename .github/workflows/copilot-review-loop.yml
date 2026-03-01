@@ -3,10 +3,12 @@ name: Copilot Review Loop
 on:
   pull_request_review:
     types: [submitted]
+  pull_request_review_comment:
+    types: [created]
 
 permissions:
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   handle_copilot_review:
@@ -15,13 +17,30 @@ jobs:
       - name: Route Copilot review outcome
         uses: actions/github-script@v7
         env:
-          COPILOT_AGENT_ASSIGNEE: ${{ vars.COPILOT_AGENT_ASSIGNEE }}
+          REVIEW_FIX_ASSIGNEE: ${{ vars.REVIEW_FIX_ASSIGNEE }}
+          CODEX_AGENT_ASSIGNEE: ${{ vars.CODEX_AGENT_ASSIGNEE }}
         with:
           script: |
             const pr = context.payload.pull_request;
+            if (!pr) {
+              core.info("No pull request in payload.");
+              return;
+            }
+
+            const isReviewEvent = context.eventName === "pull_request_review";
             const review = context.payload.review;
-            const reviewer = (review?.user?.login || '').toLowerCase();
-            const state = (review?.state || '').toLowerCase();
+            const reviewComment = context.payload.comment;
+
+            const reviewer = isReviewEvent
+              ? (review?.user?.login || "").toLowerCase()
+              : (reviewComment?.user?.login || "").toLowerCase();
+
+            const state = isReviewEvent
+              ? (review?.state || "").toLowerCase()
+              : "commented";
+
+            const sourceId = isReviewEvent ? String(review?.id || "review") : String(reviewComment?.id || "review-comment");
+            const sourceUrl = isReviewEvent ? review?.html_url : reviewComment?.html_url;
 
             if (!reviewer.includes('copilot')) {
               core.info(`Skip non-Copilot review from ${reviewer || 'unknown reviewer'}.`);
@@ -61,6 +80,36 @@ jobs:
               }
             }
 
+            async function assignPr(assignee) {
+              if (!assignee) return;
+              try {
+                await github.rest.issues.addAssignees({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  assignees: [assignee],
+                });
+              } catch (error) {
+                core.warning(`Unable to assign ${assignee} to PR #${pr.number}: ${error.message}`);
+              }
+            }
+
+            async function replyToReviewComment(assignee) {
+              if (isReviewEvent || !reviewComment?.id) return;
+              const mention = assignee ? `@${assignee}` : "Maintainer";
+              try {
+                await github.rest.pulls.createReplyForReviewComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  comment_id: reviewComment.id,
+                  body: `${mention} queued this review comment for automatic fix handling.`,
+                });
+              } catch (error) {
+                core.warning(`Unable to reply on review comment #${reviewComment.id}: ${error.message}`);
+              }
+            }
+
             async function ensureComment(marker, body) {
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
@@ -89,43 +138,51 @@ jobs:
             const linkedIssues = linkedIssuesFromPrBody(pr.body || '');
             core.info(`Copilot review state: ${state}; linked issues: ${linkedIssues.join(', ') || 'none'}`);
 
-            if (state === 'changes_requested') {
-              const marker = `<!-- copilot-review-loop:changes_requested:${review.id} -->`;
+            if (state === "changes_requested" || state === "commented") {
+              const assignee =
+                process.env.REVIEW_FIX_ASSIGNEE || process.env.CODEX_AGENT_ASSIGNEE || "";
+              const mention = assignee ? `@${assignee}` : "@codex";
+              const marker = `<!-- copilot-review-loop:action-required:${sourceId} -->`;
+              const preview = (reviewComment?.body || "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 200);
               const commentBody = [
                 marker,
-                '@copilot Please address the requested changes from your latest review and push a fix commit.',
+                `${mention} Copilot review feedback needs a fix commit on this PR.`,
                 '',
-                `Review: ${review.html_url}`,
+                `Review source: ${sourceUrl || pr.html_url}`,
+                preview ? `Latest comment excerpt: "${preview}"` : "",
                 '',
                 'Required response format:',
                 '1. List each review finding you addressed.',
                 '2. Provide file-level change summary.',
                 '3. Confirm checks reran successfully.',
-              ].join('\n');
+              ]
+                .filter(Boolean)
+                .join('\n');
 
               await ensureComment(marker, commentBody);
-
-              const assignee = process.env.COPILOT_AGENT_ASSIGNEE || 'copilot-swe-agent';
-              try {
-                await github.rest.issues.addAssignees({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                  assignees: [assignee],
-                });
-              } catch (error) {
-                core.warning(`Unable to assign ${assignee} to PR #${pr.number}: ${error.message}`);
-              }
+              await assignPr(assignee);
+              await replyToReviewComment(assignee);
 
               for (const issueNumber of linkedIssues) {
-                await syncIssueLabels(issueNumber, ['status:in-progress'], ['status:in-review', 'status:todo']);
+                await syncIssueLabels(
+                  issueNumber,
+                  ["status:in-progress", "needs:review-fix"],
+                  ["status:in-review", "status:todo"],
+                );
               }
               return;
             }
 
             if (state === 'approved') {
               for (const issueNumber of linkedIssues) {
-                await syncIssueLabels(issueNumber, ['status:in-review'], ['status:in-progress', 'status:todo']);
+                await syncIssueLabels(
+                  issueNumber,
+                  ["status:in-review"],
+                  ["status:in-progress", "status:todo", "needs:review-fix"],
+                );
               }
               return;
             }
