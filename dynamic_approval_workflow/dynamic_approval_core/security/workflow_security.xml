@@ -4,7 +4,7 @@
     <!-- ============================================================ -->
     <!-- Module Category                                               -->
     <!-- ============================================================ -->
-    <record id="module_category_workflow" model="ir.module.category">
+    <record id="module_category_dynamic_approval" model="ir.module.category">
         <field name="name">Workflow</field>
         <field name="description">Dynamic Approval Workflow</field>
         <field name="sequence">50</field>
@@ -12,7 +12,7 @@
 
     <record id="res_groups_privilege_workflow" model="res.groups.privilege">
         <field name="name">Workflow</field>
-        <field name="category_id" ref="module_category_workflow"/>
+        <field name="category_id" ref="module_category_dynamic_approval"/>
         <field name="sequence">50</field>
     </record>
 
