@@ -1,7 +1,7 @@
 {
     "name": "Dynamic Approval Workflow — Core",
     "version": "19.0.1.0.0",
-    "category": "Tools",
+    "category": "Workflow",
     "summary": "Configurable multi-step approval workflows for any Odoo model",
     "author": "Odoo Community Association (OCA)",
     "website": "https://github.com/OCA/dynamic-approval-workflow",
