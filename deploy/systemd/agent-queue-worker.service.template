@@ -1,0 +1,16 @@
+[Unit]
+Description=Dynamic Approval Agent Queue Worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/daw/agent-worker.env
+ExecStart=/usr/bin/env bash -lc 'exec "__REPO_ROOT__/scripts/run_agent_worker.sh"'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

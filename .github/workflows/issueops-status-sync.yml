@@ -43,6 +43,7 @@ jobs:
               { name: 'status:in-progress', color: 'FBCA04', description: 'Work in progress' },
               { name: 'status:in-review', color: '5319E7', description: 'PR open / under review' },
               { name: 'status:done', color: '0E8A16', description: 'Merged / completed' },
+              { name: 'needs:review-fix', color: 'B60205', description: 'Review feedback must be addressed' },
               { name: 'state:ready', color: '0E8A16', description: 'Ready for agent pickup' },
               { name: 'state:blocked', color: 'B60205', description: 'Blocked by dependency or decision' },
               { name: 'agent:codex', color: '0366D6', description: 'Task preferred for Codex' },
@@ -127,7 +128,7 @@ jobs:
             }
 
             if (action === 'closed') {
-              await remove(['status:todo', 'status:in-progress', 'status:in-review']);
+              await remove(['status:todo', 'status:in-progress', 'status:in-review', 'needs:review-fix']);
               await add(['status:done']);
             }
 
@@ -206,6 +207,6 @@ jobs:
                 await setLabels(issueNumber, [statusMap.review], ['status:todo', 'status:in-progress']);
               }
               if (action === 'closed' && pr.merged) {
-                await setLabels(issueNumber, [statusMap.done], ['status:todo', 'status:in-progress', 'status:in-review']);
+                await setLabels(issueNumber, [statusMap.done], ['status:todo', 'status:in-progress', 'status:in-review', 'needs:review-fix']);
               }
             }
