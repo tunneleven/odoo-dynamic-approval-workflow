@@ -10,7 +10,7 @@ class WorkflowController(http.Controller):
 
     @http.route(
         "/dynamic_approval/gate/evaluate",
-        type="json",
+        type="jsonrpc",
         auth="user",
     )
     def evaluate_gate(self, model, res_id, action_method):

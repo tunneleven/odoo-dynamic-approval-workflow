@@ -59,10 +59,9 @@
                 <field name="definition_key"/>
                 <filter name="archived" string="Archived"
                         domain="[('active', '=', False)]"/>
-                <group expand="0" string="Group By">
-                    <filter name="group_company" string="Company"
-                            context="{'group_by': 'company_id'}"/>
-                </group>
+                <separator string="Group By"/>
+                <filter name="group_company" string="Company"
+                        context="{'group_by': 'company_id'}"/>
             </search>
         </field>
     </record>

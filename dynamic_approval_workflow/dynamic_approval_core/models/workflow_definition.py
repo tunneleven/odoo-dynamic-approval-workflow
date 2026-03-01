@@ -44,13 +44,10 @@ class WorkflowDefinition(models.Model):
     )
     active = fields.Boolean(default=True)
 
-    _sql_constraints = [
-        (
-            "unique_company_key",
-            "UNIQUE(company_id, definition_key)",
-            "Definition key must be unique per company.",
-        ),
-    ]
+    _unique_company_key = models.Constraint(
+        "UNIQUE(company_id, definition_key)",
+        "Definition key must be unique per company.",
+    )
 
     @api.depends("version_ids")
     def _compute_version_count(self):

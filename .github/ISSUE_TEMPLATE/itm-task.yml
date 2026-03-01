@@ -1,0 +1,116 @@
+name: ITM Task
+description: Create a GitHub Issue from one ITM task block
+title: "[TASK-XXXX] <verb-first title>"
+labels:
+  - type:task
+  - needs-triage
+  - status:todo
+body:
+  - type: input
+    id: task_id
+    attributes:
+      label: Task ID
+      description: ITM task identifier
+      placeholder: TASK-P1-001
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Phase
+      options:
+        - "1 - Core Models + Security"
+        - "2 - Binding + Enforcement"
+        - "3 - BPMN + Runtime"
+        - "4 - Approver + Tasks + Signature"
+        - "5 - Access + Notifications + Webhooks"
+        - "6 - Ops + Contracts + Tests"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - dynamic_approval_core
+        - dynamic_approval_bpmn
+        - dynamic_approval_operations
+    validations:
+      required: true
+
+  - type: dropdown
+    id: preferred_agent
+    attributes:
+      label: Preferred agent
+      description: Agent that should pick up the task
+      options:
+        - either
+        - codex
+        - copilot
+        - antigravity
+    validations:
+      required: true
+
+  - type: textarea
+    id: depends_on
+    attributes:
+      label: Depends on
+      description: One task ID per line
+      placeholder: |
+        TASK-P1-001
+        TASK-P1-002
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: Copy title + purpose from ITM
+      placeholder: Implement workflow.definition model with constraints and CRUD safeguards.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Copy from ITM block as checklist items
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files to create/modify
+      description: Keep to max 3 files touched per task per ITM rule
+      placeholder: |
+        Create:
+        - models/workflow_definition.py
+
+        Modify:
+        - models/__init__.py
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification command(s)
+      description: Paste ITM verification command
+      render: bash
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: done_gate
+    attributes:
+      label: Done gate
+      options:
+        - label: Linked PR includes "Closes #<issue>" and TASK ID in title/body
+        - label: Required checks are green
+        - label: Code review approved
+        - label: PR includes evidence for verification commands

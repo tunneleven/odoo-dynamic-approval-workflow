@@ -140,6 +140,7 @@ def _job_execute_callback(self, ...):
 - **Never** commit transactions manually (`cr.commit()`).
 - **Never** use `sudo()` without documented justification. Prefer proper access rights.
 - **Never** catch bare `Exception`. Catch specific exceptions.
+- **Never** use legacy `_sql_constraints`; use Odoo 19 `models.Constraint(...)` attributes.
 - **Never** use mutable default arguments.
 - **Never** modify `self.env.context` directly; use `self.with_context()`.
 - **Never** hardcode record IDs. Use XML IDs via `self.env.ref()`.
@@ -187,6 +188,10 @@ def _evaluate_gate(self, target_model, target_method, res_ids):
 ## 7. XML Standards
 
 - 4-space indentation (OCA standard).
+- Odoo 19 security model rule: `res.groups` MUST use `privilege_id`; never use `category_id` on `res.groups`.
+- Group categorization must be modeled as: `ir.module.category` → `res.groups.privilege` → `res.groups`.
+- Odoo 19 cron rule: never use `numbercall` or `doall` on `ir.cron` records.
+- Odoo 19 search view rule: never use `<group expand="...">` inside `<search>`; use filters/separators.
 - XML IDs: `<module_name>.<object_type>_<model_name>[_<qualifier>]`.
   - View: `dynamic_approval_core.view_workflow_definition_form`
   - Action: `dynamic_approval_core.action_workflow_definition`

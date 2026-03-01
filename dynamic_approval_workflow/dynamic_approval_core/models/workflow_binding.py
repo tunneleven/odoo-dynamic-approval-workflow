@@ -69,10 +69,7 @@ class WorkflowBinding(models.Model):
         string="Rollout Scopes",
     )
 
-    _sql_constraints = [
-        (
-            "unique_model_action_company",
-            "UNIQUE(target_model, target_action_method, company_id)",
-            "Only one active binding per model/action/company.",
-        ),
-    ]
+    _unique_model_action_company = models.Constraint(
+        "UNIQUE(target_model, target_action_method, company_id)",
+        "Only one active binding per model/action/company.",
+    )

@@ -1,0 +1,28 @@
+name: Odoo 19 Compat Guard
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+    paths:
+      - "dynamic_approval_workflow/**/*.xml"
+      - "scripts/check_odoo19_compat.py"
+      - ".github/workflows/odoo19-compat-guard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xml_compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Odoo 19 XML compatibility
+        run: python scripts/check_odoo19_compat.py --root dynamic_approval_workflow
