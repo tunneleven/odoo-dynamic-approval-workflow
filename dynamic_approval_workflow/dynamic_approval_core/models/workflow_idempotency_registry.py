@@ -71,10 +71,7 @@ class WorkflowIdempotencyRegistry(models.Model):
         index=True,
     )
 
-    _sql_constraints = [
-        (
-            "unique_operation_scope_hash",
-            "UNIQUE(operation_scope_hash)",
-            "Duplicate idempotency scope detected.",
-        ),
-    ]
+    _unique_operation_scope_hash = models.Constraint(
+        "UNIQUE(operation_scope_hash)",
+        "Duplicate idempotency scope detected.",
+    )

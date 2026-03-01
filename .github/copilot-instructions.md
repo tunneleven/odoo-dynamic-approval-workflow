@@ -21,6 +21,10 @@ Odoo 19 approval workflow system. 3 addons: `dynamic_approval_core`, `dynamic_ap
 10. **Tokens never deleted.** State transitions only: `active` → `consumed` / `cancelled`.
 11. **Fail-closed.** Interceptor errors block the action in `orm_enforced` / `hybrid` modes.
 12. **Read `LESSONS.md`** before starting work. Append mistakes that took > 1 fix.
+13. **Odoo 19 group schema.** `res.groups` uses `privilege_id` (not `category_id`).
+14. **Odoo 19 cron schema.** `ir.cron` must not use removed fields `numbercall` or `doall`.
+15. **Odoo 19 search views.** Do not use `<group expand="...">` in `<search>` arches.
+16. **Odoo 19 constraints.** Use `models.Constraint(...)`; do not use `_sql_constraints`.
 
 ## Comment Policy
 - Docstrings on public methods: one-line summary + params if non-obvious.
@@ -64,6 +68,7 @@ pre-commit run --all-files
 
 ## XML
 - 4-space indent. XML IDs: `<module>.<type>_<model>[_<qualifier>]`.
+- For security groups in Odoo 19: `ir.module.category` → `res.groups.privilege` → `res.groups`.
 - `noupdate="1"` for security data. `noupdate="0"` for views.
 
 ## JavaScript / OWL

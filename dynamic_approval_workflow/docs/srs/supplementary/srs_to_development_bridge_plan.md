@@ -124,7 +124,7 @@ For each Odoo model, specify:
 | `_order` | `name asc, id desc` |
 | `_rec_name` | `display_name` |
 | Fields table | See format below |
-| SQL constraints | `_sql_constraints = [...]` |
+| SQL constraints | `models.Constraint(...)` attributes |
 | Python constraints | `@api.constrains(...)` methods |
 | Compute method signatures | Method name, dependencies, logic summary |
 | CRUD override signatures | Which of `create/write/unlink/copy` are overridden and why |

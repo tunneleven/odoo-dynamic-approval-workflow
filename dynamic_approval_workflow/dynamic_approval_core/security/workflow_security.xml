@@ -10,6 +10,12 @@
         <field name="sequence">50</field>
     </record>
 
+    <record id="res_groups_privilege_workflow" model="res.groups.privilege">
+        <field name="name">Workflow</field>
+        <field name="category_id" ref="module_category_workflow"/>
+        <field name="sequence">50</field>
+    </record>
+
     <!-- ============================================================ -->
     <!-- Security Groups (SDS §15.1)                                   -->
     <!-- ============================================================ -->
@@ -17,7 +23,7 @@
     <!-- Approver — implied by base.group_user -->
     <record id="group_workflow_approver" model="res.groups">
         <field name="name">Workflow Approver</field>
-        <field name="category_id" ref="module_category_workflow"/>
+        <field name="privilege_id" ref="res_groups_privilege_workflow"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         <field name="comment">
             Read tasks, approve/reject, view assigned instances.
@@ -27,7 +33,7 @@
     <!-- Designer — implied by group_workflow_approver -->
     <record id="group_workflow_designer" model="res.groups">
         <field name="name">Workflow Designer</field>
-        <field name="category_id" ref="module_category_workflow"/>
+        <field name="privilege_id" ref="res_groups_privilege_workflow"/>
         <field name="implied_ids" eval="[(4, ref('group_workflow_approver'))]"/>
         <field name="comment">
             Create/edit definitions, manage bindings, view all instances.
@@ -37,7 +43,7 @@
     <!-- Admin — implied by group_workflow_designer -->
     <record id="group_workflow_admin" model="res.groups">
         <field name="name">Workflow Administrator</field>
-        <field name="category_id" ref="module_category_workflow"/>
+        <field name="privilege_id" ref="res_groups_privilege_workflow"/>
         <field name="implied_ids" eval="[(4, ref('group_workflow_designer'))]"/>
         <field name="comment">
             Full CRUD on all workflow models, manage security,
@@ -48,7 +54,7 @@
     <!-- Auditor — implied by base.group_user (independent branch) -->
     <record id="group_workflow_auditor" model="res.groups">
         <field name="name">Workflow Auditor</field>
-        <field name="category_id" ref="module_category_workflow"/>
+        <field name="privilege_id" ref="res_groups_privilege_workflow"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         <field name="comment">
             Read-only access to all workflow models, audit events,

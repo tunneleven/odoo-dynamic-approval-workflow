@@ -4,7 +4,7 @@
     <!-- ======== Diagram View (embedded in definition form) ======== -->
     <record id="workflow_diagram_view_form" model="ir.ui.view">
         <field name="name">workflow.definition.version.diagram.form</field>
-        <field name="model">workflow.definition.version</field>
+        <field name="model">workflow.definition</field>
         <field name="inherit_id"
                ref="dynamic_approval_core.workflow_definition_view_form"/>
         <field name="arch" type="xml">

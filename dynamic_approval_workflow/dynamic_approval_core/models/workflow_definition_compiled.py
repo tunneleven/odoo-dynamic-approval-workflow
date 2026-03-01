@@ -38,10 +38,7 @@ class WorkflowDefinitionCompiled(models.Model):
         index=True,
     )
 
-    _sql_constraints = [
-        (
-            "unique_bpmn_hash_company",
-            "UNIQUE(bpmn_hash, company_id)",
-            "Compiled artifact must be unique per BPMN hash and company.",
-        ),
-    ]
+    _unique_bpmn_hash_company = models.Constraint(
+        "UNIQUE(bpmn_hash, company_id)",
+        "Compiled artifact must be unique per BPMN hash and company.",
+    )

@@ -28,6 +28,22 @@
 
 ## Entries
 
+### LESSON-005: Odoo 19 migration errors require repo-wide compatibility guard
+- **Date:** 2026-03-01
+- **Task:** TASK-P1-001
+- **Symptom:** Additional Odoo 19 install failures surfaced after the `res.groups.category_id` fix (`ir.cron.numbercall`, search view `group expand`, mixed-model inherited view).
+- **Root cause:** Legacy snippets from pre-19 patterns were still present in module XML and in design docs, and there was no automated guard in CI.
+- **Fix:** Removed incompatible XML fields/attributes, corrected inherited view model mismatch, migrated `_sql_constraints` usages to `models.Constraint(...)`, and added `scripts/check_odoo19_compat.py` + `.github/workflows/odoo19-compat-guard.yml`.
+- **Prevention rule:** Every PR touching XML must pass Odoo 19 compatibility guard; never copy snippets without validating fields/attributes against local Odoo 19 source models.
+
+### LESSON-004: Odoo 19 security groups use `privilege_id`, not `category_id`
+- **Date:** 2026-03-01
+- **Task:** TASK-P1-001
+- **Symptom:** Module install failed with `ValueError: Invalid field 'category_id' in 'res.groups'`.
+- **Root cause:** Security XML used pre-19 `res.groups` schema and assigned `category_id` directly on groups.
+- **Fix:** Migrated group definitions to Odoo 19 pattern: create `res.groups.privilege` linked to `ir.module.category` and set `privilege_id` on all workflow groups. Updated OMB-03 and agent instructions to enforce this rule.
+- **Prevention rule:** Before coding security XML, validate target model fields against local Odoo source (`odoo/addons/base/models/res_groups.py`) and reject any snippet that sets `category_id` on `res.groups`.
+
 ### LESSON-001: SDS v0.2 had wrong module count — architecture drift
 - **Date:** 2026-03-01
 - **Task:** SDS authoring

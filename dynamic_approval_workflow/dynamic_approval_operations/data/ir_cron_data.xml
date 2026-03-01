@@ -7,7 +7,6 @@
         <field name="model_id" ref="model_workflow_archive_job"/>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
         <field name="active" eval="False"/>
         <field name="code">model._cron_run_archival()</field>
     </record>
