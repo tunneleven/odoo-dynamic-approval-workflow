@@ -1,4 +1,7 @@
-from odoo import api, fields, models
+import re
+
+from odoo import _, api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class WorkflowDefinition(models.Model):
@@ -14,6 +17,7 @@ class WorkflowDefinition(models.Model):
     _description = "Workflow Definition"
     _inherit = ["mail.thread", "mail.activity.mixin"]
     _order = "name"
+    _definition_key_regex = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
 
     name = fields.Char(required=True, tracking=True)
     definition_key = fields.Char(
@@ -54,6 +58,23 @@ class WorkflowDefinition(models.Model):
         for record in self:
             record.version_count = len(record.version_ids)
 
+    @api.constrains("definition_key")
+    def _check_definition_key_format(self):
+        for record in self:
+            if not self._definition_key_regex.fullmatch(record.definition_key or ""):
+                raise ValidationError(
+                    _(
+                        "Definition key must match ^[a-z][a-z0-9_]{2,63}$ "
+                        "(lowercase letters, digits, underscores)."
+                    )
+                )
+
+    def unlink(self):
+        for record in self:
+            if record.version_ids.filtered(lambda version: version.state == "published"):
+                raise ValidationError(_("Cannot delete a workflow definition with published versions."))
+        return super().unlink()
+
 
 class WorkflowDefinitionTag(models.Model):
     """Freeform tags for organising workflow definitions."""
@@ -63,4 +84,15 @@ class WorkflowDefinitionTag(models.Model):
     _order = "name"
 
     name = fields.Char(required=True)
-    color = fields.Integer()
+    color = fields.Integer(default=0)
+    company_id = fields.Many2one(
+        "res.company",
+        required=True,
+        default=lambda self: self.env.company,
+        index=True,
+    )
+
+    _unique_name_company = models.Constraint(
+        "UNIQUE(name, company_id)",
+        "Tag name must be unique per company.",
+    )
