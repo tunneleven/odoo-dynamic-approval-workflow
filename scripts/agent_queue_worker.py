@@ -149,7 +149,7 @@ def _comment_issue(repo: str, issue_number: int, body: str, dry_run: bool) -> No
 
 
 def _assign_issue(repo: str, issue_number: int, assignee: str, dry_run: bool) -> None:
-    cmd = [
+    cmd_assign = [
         "gh",
         "issue",
         "edit",
@@ -159,10 +159,22 @@ def _assign_issue(repo: str, issue_number: int, assignee: str, dry_run: bool) ->
         "--add-assignee",
         assignee,
     ]
+    cmd_label = [
+        "gh",
+        "issue",
+        "edit",
+        str(issue_number),
+        "--repo",
+        repo,
+        "--add-label",
+        "status:in-progress",
+    ]
     if dry_run:
-        print(f"DRY-RUN: {shlex.join(cmd)}")
+        print(f"DRY-RUN: {shlex.join(cmd_assign)}")
+        print(f"DRY-RUN: {shlex.join(cmd_label)}")
         return
-    _run(cmd, check=True)
+    _run(cmd_assign, check=True)
+    _run(cmd_label, check=True)
 
 
 def _format_start_command(template: str, repo: str, issue: dict, mode: str) -> str:
