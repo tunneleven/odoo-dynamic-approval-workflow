@@ -1,0 +1,211 @@
+name: IssueOps Status Sync
+
+on:
+  issues:
+    types: [opened, reopened, assigned, closed, labeled]
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize, closed]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  ensure_labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure IssueOps labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'needs-triage', color: 'FBCA04', description: 'Needs initial triage' },
+              { name: 'type:task', color: '0052CC', description: 'Work item from ITM manifest' },
+              { name: 'type:model', color: '5319E7', description: 'Model implementation task' },
+              { name: 'type:view', color: '1D76DB', description: 'View implementation task' },
+              { name: 'type:security', color: 'B60205', description: 'Security implementation task' },
+              { name: 'type:js', color: 'C5DEF5', description: 'Frontend/JS implementation task' },
+              { name: 'type:data', color: 'BFDADC', description: 'Data/readme/compliance task' },
+              { name: 'type:test', color: '0E8A16', description: 'Test implementation task' },
+              { name: 'phase:1', color: 'D4C5F9', description: 'ITM Phase 1' },
+              { name: 'phase:2', color: 'C5DEF5', description: 'ITM Phase 2' },
+              { name: 'phase:3', color: 'BFDADC', description: 'ITM Phase 3' },
+              { name: 'phase:4', color: 'F9D0C4', description: 'ITM Phase 4' },
+              { name: 'phase:5', color: 'FEF2C0', description: 'ITM Phase 5' },
+              { name: 'phase:6', color: 'D4EDD6', description: 'ITM Phase 6' },
+              { name: 'module:core', color: '0366D6', description: 'dynamic_approval_core module task' },
+              { name: 'module:bpmn', color: '6F42C1', description: 'dynamic_approval_bpmn module task' },
+              { name: 'module:operations', color: '0B7285', description: 'dynamic_approval_operations module task' },
+              { name: 'size:S', color: '0E8A16', description: 'Small task (1-2h)' },
+              { name: 'size:M', color: 'FBCA04', description: 'Medium task (3-5h)' },
+              { name: 'size:L', color: 'B60205', description: 'Large task (6-8h)' },
+              { name: 'status:todo', color: '1D76DB', description: 'Ready to be picked up' },
+              { name: 'status:in-progress', color: 'FBCA04', description: 'Work in progress' },
+              { name: 'status:in-review', color: '5319E7', description: 'PR open / under review' },
+              { name: 'status:done', color: '0E8A16', description: 'Merged / completed' },
+              { name: 'state:ready', color: '0E8A16', description: 'Ready for agent pickup' },
+              { name: 'state:blocked', color: 'B60205', description: 'Blocked by dependency or decision' },
+              { name: 'agent:codex', color: '0366D6', description: 'Task preferred for Codex' },
+              { name: 'agent:copilot', color: '6F42C1', description: 'Task preferred for GitHub Copilot' },
+              { name: 'agent:antigravity', color: 'C2E0C6', description: 'Task preferred for Antigravity' },
+              { name: 'agent:either', color: 'BFDADC', description: 'Task can be picked by any agent' }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description,
+                  });
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+  sync_issue_status:
+    if: github.event_name == 'issues'
+    needs: ensure_labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync issue labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const action = context.payload.action;
+            const statusLabels = ['status:todo', 'status:in-progress', 'status:in-review', 'status:done'];
+            const currentLabels = new Set(issue.labels.map((l) => l.name));
+
+            async function add(labels) {
+              const toAdd = labels.filter((name) => !currentLabels.has(name));
+              if (!toAdd.length) return;
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: toAdd,
+              });
+            }
+
+            async function remove(labels) {
+              for (const label of labels) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name: label,
+                  });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+            }
+
+            if (action === 'opened' || action === 'reopened') {
+              const hasStatus = [...currentLabels].some((name) => statusLabels.includes(name));
+              if (!hasStatus) {
+                await add(['status:todo']);
+              }
+              await add(['state:ready']);
+            }
+
+            if (action === 'assigned') {
+              await remove(['status:todo']);
+              await add(['status:in-progress']);
+            }
+
+            if (action === 'closed') {
+              await remove(['status:todo', 'status:in-progress', 'status:in-review']);
+              await add(['status:done']);
+            }
+
+            if (action === 'labeled' && context.payload.label) {
+              const labelName = context.payload.label.name;
+              if (labelName.startsWith('agent:')) {
+                const agent = labelName.split(':')[1];
+                await add(['state:ready']);
+
+                const guidance = {
+                  codex: 'Codex pickup requested. Create a branch, open PR with `Closes #' + issue.number + '`, and keep TASK ID in PR body.',
+                  copilot: 'Copilot pickup requested. Assign to Copilot agent from GitHub UI and keep `Closes #' + issue.number + '` in PR.',
+                  antigravity: 'Antigravity pickup requested. Start from this issue, then open PR with `Closes #' + issue.number + '` and verification evidence.',
+                  either: 'Any approved agent can pick this task. Keep ITM constraints and PR evidence checklist.'
+                };
+
+                const message = guidance[agent] || guidance.either;
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: message,
+                });
+              }
+            }
+
+  sync_from_pr:
+    if: github.event_name == 'pull_request'
+    needs: ensure_labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync linked issue labels from PR lifecycle
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const action = context.payload.action;
+            const statusMap = {
+              review: 'status:in-review',
+              done: 'status:done',
+            };
+
+            const body = pr.body || '';
+            const linked = new Set();
+            const regex = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+            let match;
+            while ((match = regex.exec(body)) !== null) {
+              linked.add(Number(match[1]));
+            }
+
+            async function setLabels(issueNumber, add, remove) {
+              for (const label of remove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issueNumber,
+                    name: label,
+                  });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+              if (add.length) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  labels: add,
+                });
+              }
+            }
+
+            for (const issueNumber of linked) {
+              if (['opened', 'reopened', 'ready_for_review', 'synchronize'].includes(action)) {
+                await setLabels(issueNumber, [statusMap.review], ['status:todo', 'status:in-progress']);
+              }
+              if (action === 'closed' && pr.merged) {
+                await setLabels(issueNumber, [statusMap.done], ['status:todo', 'status:in-progress', 'status:in-review']);
+              }
+            }
