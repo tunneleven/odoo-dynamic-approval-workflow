@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="dynamic_approval_bpmn.BpmnModeler">
+        <div class="o_daw_bpmn_modeler" style="width: 100%; min-height: 500px;">
+            <!-- bpmn-js canvas mounts here -->
+        </div>
+    </t>
+
+</templates>

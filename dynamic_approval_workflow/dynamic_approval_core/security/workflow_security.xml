@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- Module Category                                               -->
+    <!-- ============================================================ -->
+    <record id="module_category_dynamic_approval" model="ir.module.category">
+        <field name="name">Dynamic Approval Workflow</field>
+        <field name="sequence">200</field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Security Groups (SDS §15.1)                                   -->
+    <!-- ============================================================ -->
+
+    <!-- Approver — implied by base.group_user -->
+    <record id="group_workflow_approver" model="res.groups">
+        <field name="name">Workflow Approver</field>
+        <field name="category_id" ref="module_category_dynamic_approval"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">
+            Read tasks, approve/reject, view assigned instances.
+        </field>
+    </record>
+
+    <!-- Designer — implied by group_workflow_approver -->
+    <record id="group_workflow_designer" model="res.groups">
+        <field name="name">Workflow Designer</field>
+        <field name="category_id" ref="module_category_dynamic_approval"/>
+        <field name="implied_ids" eval="[(4, ref('group_workflow_approver'))]"/>
+        <field name="comment">
+            Create/edit definitions, manage bindings, view all instances.
+        </field>
+    </record>
+
+    <!-- Admin — implied by group_workflow_designer -->
+    <record id="group_workflow_admin" model="res.groups">
+        <field name="name">Workflow Administrator</field>
+        <field name="category_id" ref="module_category_dynamic_approval"/>
+        <field name="implied_ids" eval="[(4, ref('group_workflow_designer'))]"/>
+        <field name="comment">
+            Full CRUD on all workflow models, manage security,
+            resolve incidents.
+        </field>
+    </record>
+
+    <!-- Auditor — implied by base.group_user (independent branch) -->
+    <record id="group_workflow_auditor" model="res.groups">
+        <field name="name">Workflow Auditor</field>
+        <field name="category_id" ref="module_category_dynamic_approval"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">
+            Read-only access to all workflow models, audit events,
+            evidence.
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Multi-Company Record Rules (SDS §9)                           -->
+    <!-- ============================================================ -->
+
+    <record id="rule_workflow_definition_company" model="ir.rule">
+        <field name="name">Workflow Definition: multi-company</field>
+        <field name="model_id" ref="model_workflow_definition"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_instance_company" model="ir.rule">
+        <field name="name">Workflow Instance: multi-company</field>
+        <field name="model_id" ref="model_workflow_instance"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_task_company" model="ir.rule">
+        <field name="name">Workflow Task: multi-company</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_binding_company" model="ir.rule">
+        <field name="name">Workflow Binding: multi-company</field>
+        <field name="model_id" ref="model_workflow_binding"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_incident_company" model="ir.rule">
+        <field name="name">Workflow Incident: multi-company</field>
+        <field name="model_id" ref="model_workflow_incident"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+</odoo>

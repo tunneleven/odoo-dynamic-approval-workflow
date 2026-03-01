@@ -1,0 +1,25 @@
+exclude: |
+  (?x)
+  /static/lib/
+repos:
+  - repo: https://github.com/OCA/maintainer-tools
+    rev: master
+    hooks:
+      - id: oca-update-pre-commit
+  - repo: https://github.com/oca/pylint-odoo
+    rev: v9.1.2
+    hooks:
+      - id: pylint_odoo
+        args:
+          - --rcfile=.pylintrc
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [css, xml]

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- SDS §6.3 Hybrid Scheduler Cron Jobs -->
+
+    <!-- Timer discovery — scan for expired timers/SLAs (1 min) -->
+    <record id="ir_cron_workflow_timer_discovery" model="ir.cron">
+        <field name="name">Workflow: Timer Discovery</field>
+        <field name="model_id" ref="model_workflow_instance"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active" eval="False"/>
+        <field name="code">model._cron_discover_expired_timers()</field>
+    </record>
+
+    <!-- SLA checker — approaching/breached deadlines (5 min) -->
+    <record id="ir_cron_workflow_sla_checker" model="ir.cron">
+        <field name="name">Workflow: SLA Checker</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active" eval="False"/>
+        <field name="code">model._cron_check_sla_deadlines()</field>
+    </record>
+
+    <!-- Grant reconciliation — orphan detection (1 hour) -->
+    <record id="ir_cron_workflow_grant_reconciliation" model="ir.cron">
+        <field name="name">Workflow: Grant Reconciliation</field>
+        <field name="model_id" ref="model_workflow_access_grant"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="active" eval="False"/>
+        <field name="code">model._cron_reconcile_grants()</field>
+    </record>
+
+    <!-- Deadline checker — approaching task deadlines (5 min) -->
+    <record id="ir_cron_workflow_deadline_checker" model="ir.cron">
+        <field name="name">Workflow: Deadline Checker</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active" eval="False"/>
+        <field name="code">model._cron_check_deadlines()</field>
+    </record>
+
+</odoo>

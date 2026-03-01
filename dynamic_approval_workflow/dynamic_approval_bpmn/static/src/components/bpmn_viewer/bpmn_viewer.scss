@@ -1,0 +1,29 @@
+.o_daw_bpmn_viewer {
+    position: relative;
+    width: 100%;
+    min-height: 400px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+/* Node state overlay classes (SDS §5.4) */
+.o_daw_node_active {
+    fill: #17a2b8 !important;
+    stroke: #117a8b !important;
+}
+
+.o_daw_node_completed {
+    fill: #28a745 !important;
+    stroke: #1e7e34 !important;
+}
+
+.o_daw_node_pending {
+    fill: #ffc107 !important;
+    stroke: #d39e00 !important;
+}
+
+.o_daw_node_error {
+    fill: #dc3545 !important;
+    stroke: #bd2130 !important;
+}

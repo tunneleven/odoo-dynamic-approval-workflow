@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Operations root under Approvals -->
+    <menuitem id="menu_workflow_operations"
+              name="Operations"
+              parent="dynamic_approval_core.menu_workflow_root"
+              groups="dynamic_approval_core.group_workflow_admin"
+              sequence="40"/>
+
+    <menuitem id="menu_workflow_ops_dashboard"
+              name="Dashboard"
+              parent="menu_workflow_operations"
+              action="workflow_operations_dashboard_action"
+              sequence="10"/>
+
+    <menuitem id="menu_workflow_retention_policies"
+              name="Retention Policies"
+              parent="menu_workflow_operations"
+              action="workflow_retention_policy_action"
+              sequence="20"/>
+
+    <menuitem id="menu_workflow_archive_jobs"
+              name="Archive Jobs"
+              parent="menu_workflow_operations"
+              action="workflow_archive_job_action"
+              sequence="30"/>
+
+</odoo>

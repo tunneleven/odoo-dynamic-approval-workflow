@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Diagram sub-menus under Configuration -->
+    <menuitem id="menu_workflow_diagram_validation"
+              name="Diagram Validation"
+              parent="dynamic_approval_core.menu_workflow_config"
+              action="workflow_diagram_validation_result_action"
+              groups="dynamic_approval_core.group_workflow_designer"
+              sequence="40"/>
+
+</odoo>

@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_workflow_retention_policy_admin,workflow.retention.policy.admin,model_workflow_retention_policy,dynamic_approval_core.group_workflow_admin,1,1,1,1
+access_workflow_retention_policy_auditor,workflow.retention.policy.auditor,model_workflow_retention_policy,dynamic_approval_core.group_workflow_auditor,1,0,0,0
+access_workflow_archive_job_admin,workflow.archive.job.admin,model_workflow_archive_job,dynamic_approval_core.group_workflow_admin,1,1,1,0
+access_workflow_archive_job_auditor,workflow.archive.job.auditor,model_workflow_archive_job,dynamic_approval_core.group_workflow_auditor,1,0,0,0

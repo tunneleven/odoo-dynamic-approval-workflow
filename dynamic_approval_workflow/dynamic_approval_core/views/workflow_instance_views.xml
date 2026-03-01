@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======== Tree ======== -->
+    <record id="workflow_instance_view_list" model="ir.ui.view">
+        <field name="name">workflow.instance.list</field>
+        <field name="model">workflow.instance</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="definition_id"/>
+                <field name="state"
+                       decoration-success="state == 'completed_approved'"
+                       decoration-danger="state in ('completed_rejected', 'error_incident')"
+                       decoration-warning="state == 'cancelled'"
+                       widget="badge"/>
+                <field name="requester_id"/>
+                <field name="started_at_utc"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ======== Form ======== -->
+    <record id="workflow_instance_view_form" model="ir.ui.view">
+        <field name="name">workflow.instance.form</field>
+        <field name="model">workflow.instance</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="running,waiting_human,completed_approved"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="definition_id"/>
+                            <field name="definition_version_id"/>
+                            <field name="requester_id"/>
+                        </group>
+                        <group>
+                            <field name="res_model"/>
+                            <field name="res_id"/>
+                            <field name="correlation_id"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="started_at_utc"/>
+                        <field name="ended_at_utc"/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ======== Action ======== -->
+    <record id="workflow_instance_action" model="ir.actions.act_window">
+        <field name="name">Workflow Instances</field>
+        <field name="res_model">workflow.instance</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No workflow instances yet
+            </p>
+        </field>
+    </record>
+
+</odoo>

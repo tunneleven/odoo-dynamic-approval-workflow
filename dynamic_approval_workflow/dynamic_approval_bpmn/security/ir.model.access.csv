@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_workflow_diagram_asset_designer,workflow.diagram.asset.designer,model_workflow_diagram_asset,dynamic_approval_core.group_workflow_designer,1,1,1,0
+access_workflow_diagram_asset_admin,workflow.diagram.asset.admin,model_workflow_diagram_asset,dynamic_approval_core.group_workflow_admin,1,1,1,1
+access_workflow_diagram_validation_result_designer,workflow.diagram.validation.result.designer,model_workflow_diagram_validation_result,dynamic_approval_core.group_workflow_designer,1,0,0,0
+access_workflow_diagram_validation_result_admin,workflow.diagram.validation.result.admin,model_workflow_diagram_validation_result,dynamic_approval_core.group_workflow_admin,1,1,1,1

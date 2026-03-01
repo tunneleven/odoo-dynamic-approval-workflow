@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ======== Diagram View (embedded in definition form) ======== -->
+    <record id="workflow_diagram_view_form" model="ir.ui.view">
+        <field name="name">workflow.definition.version.diagram.form</field>
+        <field name="model">workflow.definition.version</field>
+        <field name="inherit_id"
+               ref="dynamic_approval_core.workflow_definition_view_form"/>
+        <field name="arch" type="xml">
+            <!-- Placeholder: BPMN modeler widget injected here -->
+            <xpath expr="//notebook" position="inside">
+                <page string="BPMN Diagram">
+                    <div class="o_daw_bpmn_placeholder"
+                         style="min-height: 400px; border: 1px dashed #ccc;">
+                        <p class="text-muted text-center mt-4">
+                            BPMN modeler loads here (bpmn-js OWL component)
+                        </p>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ======== Validation Results List ======== -->
+    <record id="workflow_diagram_validation_result_view_list" model="ir.ui.view">
+        <field name="name">workflow.diagram.validation.result.list</field>
+        <field name="model">workflow.diagram.validation.result</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="element_id"/>
+                <field name="element_type"/>
+                <field name="error_category"/>
+                <field name="error_code"/>
+                <field name="severity"
+                       decoration-danger="severity == 'error'"
+                       decoration-warning="severity == 'warning'"/>
+                <field name="message"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ======== Action ======== -->
+    <record id="workflow_diagram_validation_result_action" model="ir.actions.act_window">
+        <field name="name">Diagram Validation Results</field>
+        <field name="res_model">workflow.diagram.validation.result</field>
+        <field name="view_mode">list</field>
+    </record>
+
+</odoo>
