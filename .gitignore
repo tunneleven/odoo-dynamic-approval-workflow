@@ -1,0 +1,76 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =========================
+# Virtual environments
+# =========================
+venv/
+.venv/
+ENV/
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+
+# =========================
+# Odoo
+# =========================
+*.log
+filestore/
+sessions/
+
+# =========================
+# Terraform
+# =========================
+terraform/**/.terraform/
+terraform/**/terraform.tfstate
+terraform/**/terraform.tfstate.*
+terraform/**/*.tfvars
+!terraform/**/terraform.tfvars.example
+terraform/**/crash.log
+
+# =========================
+# Testing
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# =========================
+# Secrets
+# =========================
+*.pem
+*.key
+.env
+.env.*
+!.env.example

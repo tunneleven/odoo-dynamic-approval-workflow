@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars and edit if needed.
+# Authentication is read from environment variable GITHUB_TOKEN.
+
+owner                            = "tunneleven"
+repository_name                  = "odoo-dynamic-approval-workflow"
+protected_branch                 = "main"
+required_approving_review_count  = 1
+
+# Keep empty until CI status checks are ready.
+required_status_check_contexts = []
+
+# Optional override for labels
+# labels = {
+#   bug = { color = "d73a4a", description = "Something is not working" }
+# }

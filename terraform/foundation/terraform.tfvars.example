@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and edit if needed.
+# Authentication is read from environment variable GITHUB_TOKEN.
+
+owner               = "tunneleven"
+repository_name     = "odoo-dynamic-approval-workflow"
+repository_description = "Dynamic Approval Workflow for Odoo 19"
+visibility          = "public"
+default_branch      = "main"
+
+topics = [
+  "odoo",
+  "odoo19",
+  "approval-workflow",
+  "agpl",
+  "erp",
+]

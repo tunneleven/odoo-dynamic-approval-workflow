@@ -1,0 +1,39 @@
+name: Terraform Validate
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**/*.tf"
+      - "terraform/**/*.tfvars"
+      - "terraform/**/*.tfvars.example"
+  push:
+    branches:
+      - main
+    paths:
+      - "terraform/**/*.tf"
+      - "terraform/**/*.tfvars"
+      - "terraform/**/*.tfvars.example"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: [foundation, governance]
+
+    defaults:
+      run:
+        working-directory: terraform/${{ matrix.stack }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
