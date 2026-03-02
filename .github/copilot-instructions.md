@@ -1,6 +1,6 @@
 <!-- Copilot reads the first ~4000 characters for code review. Critical rules go first. -->
 <!-- Synced with AGENTS.md (canonical source). If they conflict, AGENTS.md wins. -->
-<!-- Last sync: 2026-03-01 -->
+<!-- Last sync: 2026-03-02 -->
 
 # Dynamic Approval Workflow — Copilot Instructions
 
@@ -25,6 +25,12 @@ Odoo 19 approval workflow system. 3 addons: `dynamic_approval_core`, `dynamic_ap
 14. **Odoo 19 cron schema.** `ir.cron` must not use removed fields `numbercall` or `doall`.
 15. **Odoo 19 search views.** Do not use `<group expand="...">` in `<search>` arches.
 16. **Odoo 19 constraints.** Use `models.Constraint(...)`; do not use `_sql_constraints`.
+17. **ORM efficiency in guards.** Use `search_count()` with `self.ids` for existence checks in `unlink()`/`write()`. Never `filtered()` (LESSON-011).
+18. **OMB state machine is authoritative.** Copy allowed-state lists exactly from OMB into action guards and `invisible` attrs (LESSONS-007, 008).
+19. **Zero params on button actions.** `action_*` methods take no args; data comes from stored fields (LESSON-009).
+20. **ID-based computed names need `create()` override.** Stored computes cannot reliably read `id` at compute time (LESSON-010).
+21. **SECURITY comment on every immutable write/unlink.** Explain what is blocked, why, and ACL interaction (LESSON-006).
+22. **`statusbar_visible` = all OMB states.** Never a subset (LESSON-007).
 
 ## Comment Policy
 - Docstrings on public methods: one-line summary + params if non-obvious.
