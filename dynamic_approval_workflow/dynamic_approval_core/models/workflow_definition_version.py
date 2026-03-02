@@ -127,7 +127,6 @@ class WorkflowDefinitionVersion(models.Model):
                 raise ValidationError(_("Published versions must include publish metadata."))
             if not record.bpmn_hash or not record.version:
                 raise ValidationError(_("Published versions must include BPMN hash and version number."))
-
     def _assign_next_version_number(self):
         self.ensure_one()
         latest = self.search(
