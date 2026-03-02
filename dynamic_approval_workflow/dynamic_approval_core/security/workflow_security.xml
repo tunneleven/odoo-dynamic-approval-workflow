@@ -102,6 +102,15 @@
         </field>
     </record>
 
+    <record id="rule_workflow_definition_tag_company" model="ir.rule">
+        <field name="name">Workflow Definition Tag: multi-company</field>
+        <field name="model_id" ref="model_workflow_definition_tag"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
     <record id="rule_workflow_definition_version_company" model="ir.rule">
         <field name="name">Workflow Definition Version: multi-company</field>
         <field name="model_id" ref="model_workflow_definition_version"/>
