@@ -17,6 +17,7 @@ class WorkflowIncident(models.Model):
     _order = "opened_at_utc desc"
 
     name = fields.Char(
+        size=128,
         compute="_compute_name",
         store=True,
         readonly=True,
@@ -99,6 +100,16 @@ class WorkflowIncident(models.Model):
                 f"INC-{record.id or 'new'} [{record.category or ''}]"
             )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Assign proper name with database ID after creation."""
+        records = super().create(vals_list)
+        for record in records:
+            record.name = (
+                f"INC-{record.id} [{record.category or ''}]"
+            )
+        return records
+
     def action_triage(self):
         """Transition from open to triaged."""
         for record in self:
@@ -110,11 +121,11 @@ class WorkflowIncident(models.Model):
         return True
 
     def action_retry(self):
-        """Schedule retry for triaged incident."""
+        """Schedule retry for a triaged incident."""
         for record in self:
-            if record.state not in ("open", "triaged"):
+            if record.state != "triaged":
                 raise ValidationError(
-                    _("Only open or triaged incidents can be retried.")
+                    _("Only triaged incidents can be retried.")
                 )
             record.write({
                 "state": "retry_scheduled",
@@ -122,27 +133,24 @@ class WorkflowIncident(models.Model):
             })
         return True
 
-    def action_resolve(self, note=None):
-        """Mark incident as resolved.
+    def action_resolve(self):
+        """Mark incident as resolved, reading note from resolution_note field.
 
         Raises ValidationError if incident is not in a resolvable state.
         """
         for record in self:
-            if record.state not in ("open", "triaged", "retry_scheduled"):
+            if record.state in ("resolved", "closed_with_exception"):
                 raise ValidationError(
-                    _("Only open, triaged, or retry-scheduled incidents can be resolved.")
+                    _("Resolved or closed incidents cannot be resolved again.")
                 )
-            vals = {
+            record.write({
                 "state": "resolved",
                 "resolved_at_utc": fields.Datetime.now(),
-            }
-            if note:
-                vals["resolution_note"] = note
-            record.write(vals)
+            })
         return True
 
-    def action_close_with_exception(self, note=None):
-        """Close incident with exception — no retry possible.
+    def action_close_with_exception(self):
+        """Close incident with exception, reading note from resolution_note field.
 
         Raises ValidationError if incident is already resolved or closed.
         """
@@ -151,12 +159,9 @@ class WorkflowIncident(models.Model):
                 raise ValidationError(
                     _("Resolved or closed incidents cannot be closed with exception.")
                 )
-            vals = {
+            record.write({
                 "state": "closed_with_exception",
                 "resolution_action": "close_with_exception",
                 "resolved_at_utc": fields.Datetime.now(),
-            }
-            if note:
-                vals["resolution_note"] = note
-            record.write(vals)
+            })
         return True

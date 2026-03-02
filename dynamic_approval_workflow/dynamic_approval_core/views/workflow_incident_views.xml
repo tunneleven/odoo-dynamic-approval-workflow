@@ -35,7 +35,7 @@
                     <button name="action_retry" type="object"
                             string="Retry"
                             class="btn-primary"
-                            invisible="state not in ('open', 'triaged')"
+                            invisible="state != 'triaged'"
                             groups="dynamic_approval_core.group_workflow_admin"/>
                     <button name="action_resolve" type="object"
                             string="Resolve"
@@ -48,7 +48,7 @@
                             invisible="state in ('resolved', 'closed_with_exception')"
                             groups="dynamic_approval_core.group_workflow_admin"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="open,triaged,resolved"/>
+                           statusbar_visible="open,triaged,retry_scheduled,resolved,closed_with_exception"/>
                 </header>
                 <sheet>
                     <group>

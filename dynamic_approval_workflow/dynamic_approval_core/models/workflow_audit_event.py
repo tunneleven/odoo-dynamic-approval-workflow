@@ -63,12 +63,19 @@ class WorkflowAuditEvent(models.Model):
         index=True,
     )
 
+    # SECURITY: Audit events are immutable evidence. Model-level write is
+    # blocked even if ACLs grant perm_write to any group. Any change to
+    # this behaviour must be coordinated with ir.model.access.csv so that
+    # security remains fail-closed and ACLs do not contradict model logic.
     def write(self, vals):
         """Blocked — audit events are immutable."""
         raise WorkflowIntegrityError(
             _("Audit events are immutable and cannot be modified.")
         )
 
+    # SECURITY: Deletion is blocked at the model layer to guarantee that
+    # audit evidence is append-only. ACL perm_unlink must not be relied
+    # upon to allow deletions for this model.
     def unlink(self):
         """Blocked — audit events are never deleted."""
         raise WorkflowIntegrityError(
