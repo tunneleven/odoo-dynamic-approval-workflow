@@ -84,6 +84,33 @@
         </field>
     </record>
 
+    <record id="rule_workflow_node_runtime_company" model="ir.rule">
+        <field name="name">Workflow Node Runtime: multi-company</field>
+        <field name="model_id" ref="model_workflow_node_runtime"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_token_company" model="ir.rule">
+        <field name="name">Workflow Token: multi-company</field>
+        <field name="model_id" ref="model_workflow_token"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_decision_event_company" model="ir.rule">
+        <field name="name">Workflow Decision Event: multi-company</field>
+        <field name="model_id" ref="model_workflow_decision_event"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
     <record id="rule_workflow_task_company" model="ir.rule">
         <field name="name">Workflow Task: multi-company</field>
         <field name="model_id" ref="model_workflow_task"/>
