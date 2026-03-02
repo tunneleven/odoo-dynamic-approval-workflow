@@ -2,7 +2,7 @@
 
 > Canonical instruction file for AI coding agents (OpenAI Codex, GitHub Copilot, Claude).
 > Synced with `.github/copilot-instructions.md`. If they conflict, this file wins.
-> Last updated: 2026-03-01
+> Last updated: 2026-03-02
 
 ---
 
@@ -144,6 +144,8 @@ def _job_execute_callback(self, ...):
 - **Never** use mutable default arguments.
 - **Never** modify `self.env.context` directly; use `self.with_context()`.
 - **Never** hardcode record IDs. Use XML IDs via `self.env.ref()`.
+- **Never** use Python `filtered()` for existence checks in `unlink()`/`write()` guards — use `search_count()` with `self.ids` for a single DB query (LESSON-011).
+- **Never** accept optional method params (`note=None`) in `action_*` button handlers — data must come from stored fields; button methods take zero params unless OMB specifies otherwise (LESSON-009).
 
 ### Required Patterns
 - All workflow models: `company_id = fields.Many2one('res.company', required=True, default=lambda self: self.env.company, index=True)`.
@@ -151,6 +153,8 @@ def _job_execute_callback(self, ...):
 - `for record in self:` for multi-record iteration.
 - Translatable user-facing strings: `_("Message text")`.
 - Exceptions inherit from `WorkflowError` (project base exception), not raw `UserError`.
+- When a model name pattern embeds the DB ID (e.g., `INC-{id}`), override `create()` to assign the name after `super().create()` — computed fields cannot reliably access `id` at compute time (LESSON-010).
+- State transition guards in `action_*` methods MUST be derived from the OMB state machine table, not inferred. Copy the allowed-state list from OMB exactly (LESSON-008).
 
 ### Enforcement Interceptor (ADR-002)
 - All `orm_enforced` / `hybrid` bindings use `cls._patch_method()` to wrap target business methods at registry load time.
@@ -167,6 +171,7 @@ def _job_execute_callback(self, ...):
 - `# SECURITY:` prefix for security-critical decisions.
 - `# PERF:` prefix for performance-critical decisions.
 - `# ADR-XXX:` reference when implementing an architecture decision.
+- `# SECURITY:` block comment required above EVERY `write()`/`unlink()` override that blocks modification for immutability — explain what is blocked, why, and how it interacts with ACLs (LESSON-006).
 
 ### Do Not
 - No restating what the code does: `# Set name to value` before `self.name = value`.
@@ -192,6 +197,7 @@ def _evaluate_gate(self, target_model, target_method, res_ids):
 - Group categorization must be modeled as: `ir.module.category` → `res.groups.privilege` → `res.groups`.
 - Odoo 19 cron rule: never use `numbercall` or `doall` on `ir.cron` records.
 - Odoo 19 search view rule: never use `<group expand="...">` inside `<search>`; use filters/separators.
+- `statusbar_visible` MUST list ALL states from the OMB state machine — never a subset; copy the state list from OMB verbatim (LESSON-007).
 - XML IDs: `<module_name>.<object_type>_<model_name>[_<qualifier>]`.
   - View: `dynamic_approval_core.view_workflow_definition_form`
   - Action: `dynamic_approval_core.action_workflow_definition`

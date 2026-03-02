@@ -103,6 +103,8 @@ class TestWorkflowFeature(TransactionCase):
 
 ## Cron Template
 
+> ⚠️ **Odoo 19:** Do NOT use `numbercall` or `doall` — these fields are removed. See AGENTS.md §7.
+
 ```xml
 <record id="ir_cron_workflow_action_name" model="ir.cron">
     <field name="name">DAW: Action Description</field>
@@ -112,7 +114,6 @@ class TestWorkflowFeature(TransactionCase):
     <field name="interval_number">5</field>
     <field name="interval_type">minutes</field>
     <field name="active" eval="True"/>
-    <field name="numbercall">-1</field>
 </record>
 ```
 
