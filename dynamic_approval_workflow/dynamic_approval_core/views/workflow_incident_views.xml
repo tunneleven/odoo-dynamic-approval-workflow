@@ -27,8 +27,28 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_triage" type="object"
+                            string="Triage"
+                            class="btn-primary"
+                            invisible="state != 'open'"
+                            groups="dynamic_approval_core.group_workflow_admin"/>
+                    <button name="action_retry" type="object"
+                            string="Retry"
+                            class="btn-primary"
+                            invisible="state not in ('open', 'triaged')"
+                            groups="dynamic_approval_core.group_workflow_admin"/>
+                    <button name="action_resolve" type="object"
+                            string="Resolve"
+                            class="btn-success"
+                            invisible="state not in ('open', 'triaged', 'retry_scheduled')"
+                            groups="dynamic_approval_core.group_workflow_admin"/>
+                    <button name="action_close_with_exception" type="object"
+                            string="Close With Exception"
+                            class="btn-warning"
+                            invisible="state in ('resolved', 'closed_with_exception')"
+                            groups="dynamic_approval_core.group_workflow_admin"/>
                     <field name="state" widget="statusbar"
-                           statusbar_visible="open,in_progress,resolved"/>
+                           statusbar_visible="open,triaged,resolved"/>
                 </header>
                 <sheet>
                     <group>
