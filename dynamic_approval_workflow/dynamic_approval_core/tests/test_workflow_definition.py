@@ -1,3 +1,5 @@
+from psycopg2.errors import UniqueViolation
+
 from odoo import fields
 from odoo.exceptions import ValidationError
 from odoo.tests import tagged
@@ -14,6 +16,7 @@ class TestWorkflowDefinition(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.fixed_effective_from_utc = fields.Datetime.to_datetime("2026-01-01 00:00:00")
         cls.other_company = cls.env["res.company"].create({"name": "Other Company"})
         cls.definition = cls.env["workflow.definition"].create(
             {
@@ -29,7 +32,7 @@ class TestWorkflowDefinition(TransactionCase):
 
     def test_unique_key_per_company(self):
         """Definition key must be unique per company."""
-        with self.assertRaises(Exception):
+        with self.assertRaises(UniqueViolation):
             self.env["workflow.definition"].create(
                 {
                     "name": "Duplicate",
@@ -73,7 +76,7 @@ class TestWorkflowDefinition(TransactionCase):
             {
                 "definition_id": definition.id,
                 "bpmn_xml": "<xml/>",
-                "effective_from_utc": fields.Datetime.now(),
+                "effective_from_utc": self.fixed_effective_from_utc,
             }
         )
         version.action_publish()
@@ -110,7 +113,7 @@ class TestWorkflowDefinition(TransactionCase):
             {
                 "definition_id": archived_definition.id,
                 "bpmn_xml": "<xml/>",
-                "effective_from_utc": fields.Datetime.now(),
+                "effective_from_utc": self.fixed_effective_from_utc,
             }
         )
         archived_version.action_publish()
@@ -126,7 +129,7 @@ class TestWorkflowDefinition(TransactionCase):
         self.assertEqual(tag.company_id, self.env.company, "Tag company should default to env.company")
         self.assertEqual(tag.color, 0, "Tag color should default to 0")
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(UniqueViolation):
             self.env["workflow.definition.tag"].create(
                 {
                     "name": "Finance",
@@ -161,7 +164,7 @@ class TestWorkflowDefinition(TransactionCase):
             {
                 "definition_id": self.definition.id,
                 "bpmn_xml": "<xml/>",
-                "effective_from_utc": fields.Datetime.now(),
+                "effective_from_utc": self.fixed_effective_from_utc,
             }
         )
         version.action_publish()
@@ -176,7 +179,7 @@ class TestWorkflowDefinition(TransactionCase):
             {
                 "definition_id": self.definition.id,
                 "bpmn_xml": "<xml/>",
-                "effective_from_utc": fields.Datetime.now(),
+                "effective_from_utc": self.fixed_effective_from_utc,
             }
         )
         with self.assertRaises(ValidationError):
@@ -187,7 +190,7 @@ class TestWorkflowDefinition(TransactionCase):
             {
                 "definition_id": self.definition.id,
                 "bpmn_xml": "<xml/>",
-                "effective_from_utc": fields.Datetime.now(),
+                "effective_from_utc": self.fixed_effective_from_utc,
             }
         )
         version.action_publish()
