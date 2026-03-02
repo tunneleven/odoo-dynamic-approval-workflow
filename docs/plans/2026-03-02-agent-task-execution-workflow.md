@@ -54,11 +54,13 @@ Read in this order:
 1. Issue body
 2. `dynamic_approval_workflow/docs/design/itm_dynamic_approval_workflow.md`
 3. Relevant OMB/SDS sections
-4. Existing model/security/view files that the issue touches
+4. Relevant SRS baseline/detailed sections when behavior, constraints, or acceptance intent is unclear
+5. Existing model/security/view files that the issue touches
 
 Rules:
 - Do not expand scope beyond acceptance criteria.
 - If task is already implemented, do not rework; document why and move to next actionable task.
+- SRS is mandatory reference for requirement intent; OMB/SDS define implementation details.
 
 ## 5) Implement
 
@@ -155,6 +157,7 @@ Process every Copilot comment with this decision policy:
 1. Analyze comment against:
 - issue acceptance criteria
 - ITM/OMB/SDS intent
+- SRS requirement intent (when comment changes behavior/contract scope)
 - current runtime behavior and tests
 
 2. Decide:
@@ -190,6 +193,7 @@ Before merge, confirm:
 - No unresolved critical review threads.
 - PR linked to issue via `Closes #...`.
 - Scope matches original task only.
+- Changes are aligned with SRS intent for the touched requirements.
 
 ## 12) After Merge
 
