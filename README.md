@@ -11,4 +11,3 @@ Key defaults:
 - Repository: `odoo-dynamic-approval-workflow`
 - Visibility: `public`
 - State backend: local (`terraform.tfstate`)
-

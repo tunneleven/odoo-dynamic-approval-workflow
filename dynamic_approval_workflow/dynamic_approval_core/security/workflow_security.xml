@@ -84,6 +84,33 @@
         </field>
     </record>
 
+    <record id="rule_workflow_node_runtime_company" model="ir.rule">
+        <field name="name">Workflow Node Runtime: multi-company</field>
+        <field name="model_id" ref="model_workflow_node_runtime"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_token_company" model="ir.rule">
+        <field name="name">Workflow Token: multi-company</field>
+        <field name="model_id" ref="model_workflow_token"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_decision_event_company" model="ir.rule">
+        <field name="name">Workflow Decision Event: multi-company</field>
+        <field name="model_id" ref="model_workflow_decision_event"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
     <record id="rule_workflow_task_company" model="ir.rule">
         <field name="name">Workflow Task: multi-company</field>
         <field name="model_id" ref="model_workflow_task"/>
@@ -102,9 +129,72 @@
         </field>
     </record>
 
+    <record id="rule_workflow_definition_tag_company" model="ir.rule">
+        <field name="name">Workflow Definition Tag: multi-company</field>
+        <field name="model_id" ref="model_workflow_definition_tag"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_definition_version_company" model="ir.rule">
+        <field name="name">Workflow Definition Version: multi-company</field>
+        <field name="model_id" ref="model_workflow_definition_version"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_definition_compiled_company" model="ir.rule">
+        <field name="name">Workflow Definition Compiled: multi-company</field>
+        <field name="model_id" ref="model_workflow_definition_compiled"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_condition_rule_company" model="ir.rule">
+        <field name="name">Workflow Condition Rule: multi-company</field>
+        <field name="model_id" ref="model_workflow_condition_rule"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_follower_rule_company" model="ir.rule">
+        <field name="name">Workflow Follower Rule: multi-company</field>
+        <field name="model_id" ref="model_workflow_follower_rule"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_attestation_policy_company" model="ir.rule">
+        <field name="name">Workflow Attestation Policy: multi-company</field>
+        <field name="model_id" ref="model_workflow_attestation_policy"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
     <record id="rule_workflow_incident_company" model="ir.rule">
         <field name="name">Workflow Incident: multi-company</field>
         <field name="model_id" ref="model_workflow_incident"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_workflow_audit_event_company" model="ir.rule">
+        <field name="name">Workflow Audit Event: multi-company</field>
+        <field name="model_id" ref="model_workflow_audit_event"/>
         <field name="domain_force">
             ['|', ('company_id', '=', False),
                   ('company_id', 'in', company_ids)]
