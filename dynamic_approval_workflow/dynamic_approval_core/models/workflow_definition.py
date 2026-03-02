@@ -25,7 +25,7 @@ class WorkflowDefinition(models.Model):
         required=True,
         copy=False,
         tracking=True,
-        help="Human-readable slug [a-z0-9_]+, immutable after first publish.",
+        help="Human-readable slug matching ^[a-z][a-z0-9_]{2,63}$, immutable after first publish.",
     )
     description = fields.Text()
     company_id = fields.Many2one(
@@ -69,10 +69,18 @@ class WorkflowDefinition(models.Model):
                     )
                 )
 
-    def unlink(self):
+    @api.constrains("tag_ids", "company_id")
+    def _check_tag_company_consistency(self):
         for record in self:
-            if record.version_ids.filtered(lambda version: version.state == "published"):
-                raise ValidationError(_("Cannot delete a workflow definition with published versions."))
+            if any(tag.company_id != record.company_id for tag in record.tag_ids):
+                raise ValidationError(_("Tags must belong to the same company as the workflow definition."))
+
+    def unlink(self):
+        published_count = self.env["workflow.definition.version"].search_count(
+            [("definition_id", "in", self.ids), ("state", "=", "published")]
+        )
+        if published_count:
+            raise ValidationError(_("Cannot delete a workflow definition with published versions."))
         return super().unlink()
 
 
