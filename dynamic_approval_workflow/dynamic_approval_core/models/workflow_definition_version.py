@@ -109,6 +109,25 @@ class WorkflowDefinitionVersion(models.Model):
             ):
                 raise ValidationError(_("Effective To must be later than Effective From."))
 
+    @api.constrains(
+        "state",
+        "effective_from_utc",
+        "published_at_utc",
+        "published_by_id",
+        "bpmn_hash",
+        "version",
+    )
+    def _check_publish_invariants(self):
+        for record in self:
+            if record.state != "published":
+                continue
+            if not record.effective_from_utc:
+                raise ValidationError(_("Published versions must define Effective From."))
+            if not record.published_at_utc or not record.published_by_id:
+                raise ValidationError(_("Published versions must include publish metadata."))
+            if not record.bpmn_hash or not record.version:
+                raise ValidationError(_("Published versions must include BPMN hash and version number."))
+
     def _assign_next_version_number(self):
         self.ensure_one()
         latest = self.search(
@@ -151,6 +170,8 @@ class WorkflowDefinitionVersion(models.Model):
 
     def action_clone(self):
         self.ensure_one()
+        if self.state != "published":
+            raise ValidationError(_("Only published versions can be cloned."))
         values = {
             "definition_id": self.definition_id.id,
             "state": "draft",
@@ -163,11 +184,25 @@ class WorkflowDefinitionVersion(models.Model):
         return self.create(values)
 
     def write(self, vals):
+        immutable_when_published = {
+            "bpmn_xml",
+            "bpmn_hash",
+            "version",
+            "published_at_utc",
+            "published_by_id",
+        }
         for record in self:
-            if (
-                record.state == "published"
-                and "bpmn_xml" in vals
-                and vals["bpmn_xml"] != record.bpmn_xml
-            ):
-                raise ValidationError(_("Published versions are immutable: BPMN XML cannot be modified."))
+            if record.state == "published":
+                blocked = [
+                    key
+                    for key in vals
+                    if key in immutable_when_published and vals.get(key) != record[key]
+                ]
+                if blocked:
+                    raise ValidationError(
+                        _(
+                            "Published versions are immutable; cannot modify fields: %s"
+                        )
+                        % ", ".join(sorted(blocked))
+                    )
         return super().write(vals)
