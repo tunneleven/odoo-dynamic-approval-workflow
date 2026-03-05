@@ -104,6 +104,19 @@ Examples:
 
 ## 8) Push and Open PR
 
+**Hard gate before PR creation:**
+
+- Always run a Codex code review on your branch diff before `gh pr create`.
+- Resolve all critical/high findings first, or document a scope-based rationale in the PR body.
+
+Suggested command:
+
+```bash
+codex run "Review current branch diff against main. Report findings only: bugs, regressions, risks, and missing tests, sorted by severity with file:line references." > /tmp/codex_review.md
+```
+
+Then proceed:
+
 ```bash
 git push -u origin <branch_name>
 ```
@@ -191,6 +204,7 @@ gh api graphql -f query='mutation($threadId:ID!){ resolveReviewThread(input:{thr
 Before merge, confirm:
 - All required checks success.
 - No unresolved critical review threads.
+- Codex pre-PR review was run and critical/high findings are resolved or explicitly justified.
 - PR linked to issue via `Closes #...`.
 - Scope matches original task only.
 - Changes are aligned with SRS intent for the touched requirements.

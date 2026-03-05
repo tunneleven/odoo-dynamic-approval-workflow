@@ -313,6 +313,7 @@ FR/NFR → DFR → SDS Section → OMB Spec → ITM TASK → Source File → Tes
 - Model file headers do NOT need traceability comments (the OMB provides this mapping).
 - Test methods SHOULD reference the requirement: `# Validates FR-008: gate enforcement on action_confirm`.
 - PR descriptions MUST include: `TASK-XXX`, affected `FR/NFR` IDs, and verification evidence.
+- Before creating any PR, ALWAYS run a Codex code review on the branch diff and resolve critical/high findings (or document explicit rationale for accepted risk in the PR body).
 
 ## 14. Failure Recovery Protocol
 

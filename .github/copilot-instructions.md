@@ -31,6 +31,7 @@ Odoo 19 approval workflow system. 3 addons: `dynamic_approval_core`, `dynamic_ap
 20. **ID-based computed names need `create()` override.** Stored computes cannot reliably read `id` at compute time (LESSON-010).
 21. **SECURITY comment on every immutable write/unlink.** Explain what is blocked, why, and ACL interaction (LESSON-006).
 22. **`statusbar_visible` = all OMB states.** Never a subset (LESSON-007).
+23. **Codex review before PR.** Always run a Codex code review on branch diff before creating a PR; resolve critical/high findings or document explicit risk rationale.
 
 ## Comment Policy
 - Docstrings on public methods: one-line summary + params if non-obvious.
