@@ -1,5 +1,6 @@
 from . import test_workflow_definition
 from . import test_workflow_definition_compiled
+from . import test_workflow_attestation_policy
 from . import test_workflow_binding
 from . import test_workflow_enforcement
 from . import test_workflow_runtime
