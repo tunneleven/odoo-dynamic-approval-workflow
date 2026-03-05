@@ -1,68 +1,65 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ============================================================ -->
-    <!-- Root Menu                                                     -->
-    <!-- ============================================================ -->
     <menuitem id="menu_workflow_root"
               name="Approvals"
               web_icon="dynamic_approval_core,static/description/icon.png"
-              sequence="90"/>
+              groups="dynamic_approval_core.group_workflow_approver"
+              sequence="50"/>
 
-    <!-- ============================================================ -->
-    <!-- My Tasks                                                      -->
-    <!-- ============================================================ -->
+    <menuitem id="menu_workflow_definitions"
+              name="Definitions"
+              parent="menu_workflow_root"
+              action="action_workflow_definition"
+              groups="dynamic_approval_core.group_workflow_designer"
+              sequence="10"/>
+
+    <menuitem id="menu_workflow_bindings"
+              name="Bindings"
+              parent="menu_workflow_root"
+              action="workflow_binding_action"
+              groups="dynamic_approval_core.group_workflow_designer"
+              sequence="20"/>
+
     <menuitem id="menu_workflow_my_tasks"
               name="My Tasks"
               parent="menu_workflow_root"
               action="workflow_task_action_my"
-              sequence="10"/>
+              groups="dynamic_approval_core.group_workflow_approver"
+              sequence="30"/>
 
-    <!-- ============================================================ -->
-    <!-- Instances                                                     -->
-    <!-- ============================================================ -->
     <menuitem id="menu_workflow_instances"
               name="Instances"
               parent="menu_workflow_root"
               action="workflow_instance_action"
-              sequence="20"/>
+              groups="dynamic_approval_core.group_workflow_approver"
+              sequence="40"/>
 
-    <!-- ============================================================ -->
-    <!-- Incidents                                                     -->
-    <!-- ============================================================ -->
     <menuitem id="menu_workflow_incidents"
               name="Incidents"
               parent="menu_workflow_root"
               action="workflow_incident_action"
-              groups="group_workflow_admin"
-              sequence="30"/>
+              groups="dynamic_approval_core.group_workflow_admin"
+              sequence="50"/>
 
-    <!-- ============================================================ -->
-    <!-- Configuration                                                 -->
-    <!-- ============================================================ -->
+    <menuitem id="menu_workflow_webhooks"
+              name="Webhooks"
+              parent="menu_workflow_root"
+              action="workflow_webhook_endpoint_action"
+              groups="dynamic_approval_core.group_workflow_admin"
+              sequence="60"/>
+
     <menuitem id="menu_workflow_config"
               name="Configuration"
               parent="menu_workflow_root"
-              groups="group_workflow_designer"
+              groups="dynamic_approval_core.group_workflow_admin"
               sequence="90"/>
 
-    <menuitem id="menu_workflow_definitions"
-              name="Workflow Definitions"
-              parent="menu_workflow_config"
-              action="workflow_definition_action"
-              sequence="10"/>
-
-    <menuitem id="menu_workflow_bindings"
-              name="Workflow Bindings"
-              parent="menu_workflow_config"
-              action="workflow_binding_action"
-              sequence="20"/>
-
-    <menuitem id="menu_workflow_webhooks"
+    <menuitem id="menu_workflow_webhook_endpoints"
               name="Webhook Endpoints"
               parent="menu_workflow_config"
               action="workflow_webhook_endpoint_action"
-              groups="group_workflow_admin"
+              groups="dynamic_approval_core.group_workflow_admin"
               sequence="30"/>
 
 </odoo>
