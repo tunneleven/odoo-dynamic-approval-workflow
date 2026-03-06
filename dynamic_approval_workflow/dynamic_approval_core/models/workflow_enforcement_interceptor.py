@@ -1,9 +1,14 @@
+import logging
 from functools import wraps
 from threading import RLock
 
 from odoo import _, fields, models
 
 from ..exceptions import WorkflowGateBlockedError
+
+
+_logger = logging.getLogger(__name__)
+
 
 class WorkflowEnforcementInterceptor(models.AbstractModel):
     """ORM enforcement interceptor — ``_patch_method`` wrapper logic.
@@ -25,6 +30,13 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
 
     _patch_lock = RLock()
     _patched_methods = {}
+    _INTERNAL_BYPASS_ORIGIN = "workflow.enforcement.interceptor"
+    _TRUSTED_BYPASS_TOKENS = frozenset(
+        {
+            "interceptor_audit",
+            "interceptor_incident",
+        }
+    )
 
     @classmethod
     def _apply_patches(cls, env):
@@ -79,7 +91,8 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
         @wraps(original_method)
         def _workflow_intercept_wrapper(recordset, *args, **kwargs):
             env = recordset.env
-            if env.context.get("_workflow_bypass_token"):
+            channel = env.context.get("_workflow_channel") or "rpc"
+            if cls._is_trusted_bypass(env):
                 cls._log_gate_event(
                     env,
                     model_name,
@@ -87,10 +100,10 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
                     "allowed",
                     reason_code="bypass_token",
                     recordset=recordset,
+                    channel=channel,
                 )
                 return original_method(recordset, *args, **kwargs)
 
-            channel = env.context.get("_workflow_channel") or "rpc"
             company_id = env.company.id
             binding = cls._resolve_binding(env, model_name, method_name, company_id)
             if not binding:
@@ -117,8 +130,10 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
 
             try:
                 gate_result = binding.evaluate_gate(record_context)
+            except WorkflowGateBlockedError:
+                raise
             except Exception as err:
-                cls._record_incident(
+                cls._safe_record_incident(
                     env,
                     reason_code="interceptor_error",
                     model_name=model_name,
@@ -165,6 +180,14 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
             return original_method(recordset, *args, **kwargs)
 
         return _workflow_intercept_wrapper
+
+    @classmethod
+    def _is_trusted_bypass(cls, env):
+        return (
+            env.su
+            and env.context.get("_workflow_bypass_token") in cls._TRUSTED_BYPASS_TOKENS
+            and env.context.get("_workflow_internal_origin") == cls._INTERNAL_BYPASS_ORIGIN
+        )
 
     @staticmethod
     def _resolve_binding(env, model_name, method_name, company_id):
@@ -250,6 +273,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
         }
         env["workflow.audit.event"].sudo().with_context(
             _workflow_bypass_token="interceptor_audit",
+            _workflow_internal_origin=cls._INTERNAL_BYPASS_ORIGIN,
         ).log_event(
             "workflow.gate.evaluated",
             cls._build_object_ref(model_name, recordset),
@@ -257,10 +281,24 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
             correlation_id=env.context.get("request_id"),
         )
 
+    @classmethod
+    def _safe_record_incident(cls, env, reason_code, model_name, method_name, details):
+        """Record incident defensively so fail-closed behavior is never bypassed."""
+        try:
+            cls._record_incident(env, reason_code, model_name, method_name, details)
+        except Exception:
+            _logger.exception(
+                "Failed to record workflow incident for %s.%s with reason '%s'.",
+                model_name,
+                method_name,
+                reason_code,
+            )
+
     @staticmethod
     def _record_incident(env, reason_code, model_name, method_name, details):
         env["workflow.incident"].sudo().with_context(
             _workflow_bypass_token="interceptor_incident",
+            _workflow_internal_origin=WorkflowEnforcementInterceptor._INTERNAL_BYPASS_ORIGIN,
         ).create(
             {
                 "category": "enforcement_failure",

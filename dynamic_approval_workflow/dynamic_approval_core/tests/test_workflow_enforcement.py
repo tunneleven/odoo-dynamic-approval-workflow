@@ -111,7 +111,7 @@ class TestWorkflowEnforcement(TransactionCase):
         self.assertEqual(evaluate_gate.call_count, 1, "Active binding create must activate interceptor.")
         self.assertEqual(incident.state, "triaged")
 
-    def test_bypass_token_skips_gate_evaluation_and_allows_call(self):
+    def test_untrusted_bypass_token_does_not_skip_gate_evaluation(self):
         binding = self._create_binding(
             target_action_method="action_triage",
             enforcement_mode="orm_enforced",
@@ -123,11 +123,55 @@ class TestWorkflowEnforcement(TransactionCase):
         with patch.object(
             type(binding),
             "evaluate_gate",
-            side_effect=AssertionError("evaluate_gate must be skipped for bypass token"),
-        ):
-            incident.with_context(_workflow_bypass_token="internal-only-token").action_triage()
+            return_value={
+                "state": "blocked",
+                "reason_code": "pending_approval",
+                "policy_message": "Approval required before triage.",
+            },
+        ) as evaluate_gate:
+            with self.assertRaises(WorkflowGateBlockedError):
+                incident.with_context(_workflow_bypass_token="user-supplied-token").action_triage()
 
-        self.assertEqual(incident.state, "triaged")
+        self.assertEqual(evaluate_gate.call_count, 1)
+        self.assertEqual(incident.state, "open")
+
+    def test_trusted_bypass_requires_internal_origin_and_superuser(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        non_sudo_incident = self._create_incident()
+        with patch.object(
+            type(binding),
+            "evaluate_gate",
+            return_value={
+                "state": "blocked",
+                "reason_code": "pending_approval",
+                "policy_message": "Approval required before triage.",
+            },
+        ) as evaluate_gate:
+            with self.assertRaises(WorkflowGateBlockedError):
+                non_sudo_incident.with_context(
+                    _workflow_bypass_token="interceptor_incident",
+                    _workflow_internal_origin=WorkflowEnforcementInterceptor._INTERNAL_BYPASS_ORIGIN,
+                ).action_triage()
+        self.assertEqual(evaluate_gate.call_count, 1)
+        self.assertEqual(non_sudo_incident.state, "open")
+
+        sudo_incident = self._create_incident()
+        with patch.object(
+            type(binding),
+            "evaluate_gate",
+            side_effect=AssertionError("Trusted internal bypass should skip evaluate_gate."),
+        ):
+            sudo_incident.sudo().with_context(
+                _workflow_bypass_token="interceptor_incident",
+                _workflow_internal_origin=WorkflowEnforcementInterceptor._INTERNAL_BYPASS_ORIGIN,
+            ).action_triage()
+        self.assertEqual(sudo_incident.state, "triaged")
 
     def test_blocked_gate_raises_workflow_gate_blocked_error(self):
         binding = self._create_binding(
@@ -166,6 +210,78 @@ class TestWorkflowEnforcement(TransactionCase):
                 incident.action_triage()
 
         self.assertEqual(incident.state, "open")
+
+    def test_gate_blocked_error_is_not_masked_by_fail_closed_handler(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        incident = self._create_incident()
+        with patch.object(
+            type(binding),
+            "evaluate_gate",
+            side_effect=WorkflowGateBlockedError("Already blocked by policy."),
+        ):
+            with self.assertRaisesRegex(WorkflowGateBlockedError, "Already blocked by policy."):
+                incident.action_triage()
+
+        self.assertEqual(incident.state, "open")
+
+    def test_fail_closed_survives_incident_recording_failure(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        incident = self._create_incident()
+        with patch.object(type(binding), "evaluate_gate", side_effect=RuntimeError("gate exploded")):
+            with patch.object(
+                WorkflowEnforcementInterceptor,
+                "_record_incident",
+                side_effect=RuntimeError("incident write failed"),
+            ):
+                with self.assertRaises(WorkflowGateBlockedError):
+                    incident.action_triage()
+
+        self.assertEqual(incident.state, "open")
+
+    def test_trusted_bypass_logs_channel_from_context(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        observed_channels = []
+
+        def _capture_log_event(*args, **kwargs):
+            observed_channels.append(kwargs.get("channel"))
+
+        incident = self._create_incident()
+        with patch.object(
+            WorkflowEnforcementInterceptor,
+            "_log_gate_event",
+            side_effect=_capture_log_event,
+        ):
+            with patch.object(
+                type(binding),
+                "evaluate_gate",
+                side_effect=AssertionError("Trusted internal bypass should skip evaluate_gate."),
+            ):
+                incident.sudo().with_context(
+                    _workflow_bypass_token="interceptor_incident",
+                    _workflow_internal_origin=WorkflowEnforcementInterceptor._INTERNAL_BYPASS_ORIGIN,
+                    _workflow_channel="cron",
+                ).action_triage()
+
+        self.assertEqual(observed_channels, ["cron"])
+        self.assertEqual(incident.state, "triaged")
 
     def test_interceptor_records_all_channel_contexts_and_sudo_calls(self):
         binding = self._create_binding(
