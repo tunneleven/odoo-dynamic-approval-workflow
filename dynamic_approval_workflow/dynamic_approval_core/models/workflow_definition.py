@@ -83,6 +83,24 @@ class WorkflowDefinition(models.Model):
             raise ValidationError(_("Cannot delete a workflow definition with published versions."))
         return super().unlink()
 
+    def write(self, vals):
+        if "definition_key" in vals:
+            changed_definitions = self.filtered(
+                lambda definition: definition.definition_key != vals["definition_key"]
+            )
+            if changed_definitions:
+                published_count = self.env["workflow.definition.version"].search_count(
+                    [
+                        ("definition_id", "in", changed_definitions.ids),
+                        ("state", "=", "published"),
+                    ]
+                )
+                if published_count:
+                    raise ValidationError(
+                        _("Definition key is immutable after first publish.")
+                    )
+        return super().write(vals)
+
 
 class WorkflowDefinitionTag(models.Model):
     """Freeform tags for organising workflow definitions."""

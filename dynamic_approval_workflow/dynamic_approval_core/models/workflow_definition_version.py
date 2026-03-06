@@ -127,6 +127,7 @@ class WorkflowDefinitionVersion(models.Model):
                 raise ValidationError(_("Published versions must include publish metadata."))
             if not record.bpmn_hash or not record.version:
                 raise ValidationError(_("Published versions must include BPMN hash and version number."))
+
     def _assign_next_version_number(self):
         self.ensure_one()
         latest = self.search(
@@ -190,12 +191,14 @@ class WorkflowDefinitionVersion(models.Model):
             "published_at_utc",
             "published_by_id",
         }
+        result = True
         for record in self:
+            write_vals = dict(vals)
             if record.state == "published":
                 blocked = [
                     key
-                    for key in vals
-                    if key in immutable_when_published and vals.get(key) != record[key]
+                    for key in write_vals
+                    if key in immutable_when_published and write_vals.get(key) != record[key]
                 ]
                 if blocked:
                     raise ValidationError(
@@ -204,4 +207,7 @@ class WorkflowDefinitionVersion(models.Model):
                         )
                         % ", ".join(sorted(blocked))
                     )
-        return super().write(vals)
+            if record.state == "draft" and any(field_name != "draft_revision" for field_name in write_vals):
+                write_vals["draft_revision"] = (record.draft_revision or 0) + 1
+            result = super(WorkflowDefinitionVersion, record).write(write_vals) and result
+        return result

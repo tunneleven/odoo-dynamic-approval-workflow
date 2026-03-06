@@ -21,6 +21,15 @@ class TestWorkflowSecurity(TransactionCase):
             group = self.env.ref(f"{module}.{xmlid}", raise_if_not_found=False)
             self.assertTrue(group, f"Group {xmlid} not found")
 
+    def test_binding_scope_record_rule_exists_with_company_domain(self):
+        rule = self.env.ref(
+            "dynamic_approval_core.rule_workflow_binding_scope_company",
+            raise_if_not_found=False,
+        )
+        self.assertTrue(rule, "Missing workflow.binding.scope multi-company rule")
+        self.assertEqual(rule.model_id.model, "workflow.binding.scope")
+        self.assertIn("company_ids", rule.domain_force)
+
     def test_incident_admin_acl_disallows_unlink(self):
         group_admin = self.env.ref("dynamic_approval_core.group_workflow_admin")
         acl = self.env["ir.model.access"].search(
