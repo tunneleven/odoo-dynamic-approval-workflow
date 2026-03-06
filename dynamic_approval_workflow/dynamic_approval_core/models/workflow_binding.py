@@ -102,10 +102,7 @@ class WorkflowBinding(models.Model):
     @api.constrains("target_model")
     def _check_target_model_exists(self):
         for record in self:
-            model_exists = self.env["ir.model"].sudo().search_count(
-                [("model", "=", record.target_model)]
-            )
-            if not model_exists:
+            if not record._is_installed_model(record.target_model):
                 raise ValidationError(
                     _("Target model '%s' is not installed.") % (record.target_model or "")
                 )
@@ -161,11 +158,13 @@ class WorkflowBinding(models.Model):
                 )
             return
 
-        model_exists = self.env["ir.model"].sudo().search_count([("model", "=", callback_target)])
-        if not model_exists:
+        if not self._is_installed_model(callback_target):
             raise ValidationError(
                 _("Callback model '%s' is not installed.") % callback_target
             )
+
+    def _is_installed_model(self, model_name):
+        return bool(model_name) and model_name in self.env
 
     @staticmethod
     def _looks_like_url(value):
@@ -193,11 +192,11 @@ class WorkflowBinding(models.Model):
         for record in self:
             record.action_validate()
         self.write({"is_active": True})
-        return self
+        return True
 
     def action_disable(self):
         self.write({"is_active": False})
-        return self
+        return True
 
     def evaluate_gate(self, record_context):
         self.ensure_one()
@@ -222,6 +221,9 @@ class WorkflowBinding(models.Model):
                 "binding_id": self.id,
             }
 
+        payload_data = dict(payload or {})
+        callback_user = self._resolve_callback_execution_user(payload_data)
+
         if self._looks_like_url(self.callback_model):
             return {
                 "status": "queued_external",
@@ -229,9 +231,11 @@ class WorkflowBinding(models.Model):
                 "method": self.callback_method,
                 "instance_id": instance_id,
                 "idempotency_key": idempotency_key,
+                "effective_execution_principal": self.callback_execution_principal,
+                "effective_execution_user_id": callback_user.id,
             }
 
-        callback_model = self.env[self.callback_model].sudo()
+        callback_model = self.env[self.callback_model].with_user(callback_user)
         if not hasattr(callback_model, self.callback_method):
             raise ValidationError(
                 _("Callback method '%s' does not exist on model '%s'.")
@@ -242,9 +246,65 @@ class WorkflowBinding(models.Model):
             "target_model": self.callback_model,
             "target_method": self.callback_method,
             "instance_id": instance_id,
-            "payload": payload or {},
+            "payload": payload_data,
             "idempotency_key": idempotency_key,
+            "effective_execution_principal": self.callback_execution_principal,
+            "effective_execution_user_id": callback_user.id,
         }
+
+    def _resolve_callback_execution_user(self, payload):
+        self.ensure_one()
+        principal = self.callback_execution_principal or "request_actor"
+
+        if principal == "service_principal":
+            callback_user = self.callback_service_user_id
+            if not callback_user:
+                raise ValidationError(
+                    _("Service principal requires a callback service user.")
+                )
+        elif principal == "approver_actor":
+            approver_user_id = payload.get("effective_actor_user_id")
+            if not approver_user_id:
+                raise ValidationError(
+                    _("Approver actor callbacks require payload key 'effective_actor_user_id'.")
+                )
+            callback_user = self.env["res.users"].browse(approver_user_id).exists()
+            if not callback_user:
+                raise ValidationError(
+                    _("Approver actor callback user '%s' does not exist.") % approver_user_id
+                )
+            if not callback_user.active:
+                raise ValidationError(
+                    _("Approver actor callback user '%s' is inactive.")
+                    % callback_user.display_name
+                )
+        else:
+            callback_user = self.env.user
+
+        if principal == "service_principal" and not callback_user.active:
+            raise ValidationError(
+                _("Callback execution user '%s' is inactive.") % callback_user.display_name
+            )
+
+        return callback_user
+
+    def _refresh_interceptor_patches(self):
+        from .workflow_enforcement_interceptor import WorkflowEnforcementInterceptor
+
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+    def _register_hook(self):
+        result = super()._register_hook()
+        self._refresh_interceptor_patches()
+        return result
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        if not self.env.context.get("skip_binding_revision_increment"):
+            records._increment_config_revision()
+        records._refresh_interceptor_patches()
+        return records
 
     def _increment_config_revision(self):
         for record in self:
@@ -254,8 +314,7 @@ class WorkflowBinding(models.Model):
 
     def write(self, vals):
         if (
-            not self.env.context.get("allow_active_target_write")
-            and any(field in vals for field in ("target_model", "target_action_method"))
+            any(field in vals for field in ("target_model", "target_action_method"))
             and any(self.mapped("is_active"))
         ):
             raise ValidationError(
@@ -271,4 +330,10 @@ class WorkflowBinding(models.Model):
         result = super().write(vals)
         if should_bump_revision:
             self._increment_config_revision()
+            self._refresh_interceptor_patches()
+        return result
+
+    def unlink(self):
+        result = super().unlink()
+        self._refresh_interceptor_patches()
         return result

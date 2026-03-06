@@ -206,6 +206,27 @@ class TestWorkflowDefinition(TransactionCase):
                     }
                 )
 
+    def test_definition_key_locked_after_first_publish(self):
+        definition = self.env["workflow.definition"].create(
+            {
+                "name": "Key Lock Workflow",
+                "definition_key": "key_lock_wf",
+            }
+        )
+        definition.write({"definition_key": "key_lock_wf_renamed"})
+
+        version = self.env["workflow.definition.version"].create(
+            {
+                "definition_id": definition.id,
+                "bpmn_xml": "<xml/>",
+                "effective_from_utc": self.fixed_effective_from_utc,
+            }
+        )
+        version.action_publish()
+
+        with self.assertRaises(ValidationError):
+            definition.write({"definition_key": "key_lock_wf_second_rename"})
+
     def test_unlink_blocked_when_published_version_exists(self):
         definition = self.env["workflow.definition"].create(
             {
@@ -347,3 +368,22 @@ class TestWorkflowDefinition(TransactionCase):
         )
         with self.assertRaises(ValidationError):
             version.write({"state": "published"})
+
+    def test_draft_revision_increments_on_each_draft_write(self):
+        version = self.env["workflow.definition.version"].create(
+            {
+                "definition_id": self.definition.id,
+                "bpmn_xml": "<xml/>",
+            }
+        )
+        self.assertEqual(version.draft_revision, 1)
+
+        version.write({"bpmn_xml": "<xml>updated-1</xml>"})
+        self.assertEqual(version.draft_revision, 2)
+
+        version.write(
+            {
+                "effective_from_utc": self.fixed_effective_from_utc,
+            }
+        )
+        self.assertEqual(version.draft_revision, 3)

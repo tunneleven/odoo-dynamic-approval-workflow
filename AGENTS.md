@@ -21,12 +21,12 @@ Never invent architecture. Every decision is already documented:
 
 | Document | Path | What it governs |
 |---|---|---|
-| Parent SRS | `docs/srs/baseline/dynamic_approval_workflow_srs_v1.3.md` | 95 FRs + 17 NFRs — the "what" |
-| Child SRS | `docs/srs/detailed/srs_01..srs_10_*.md` | Detailed requirements per domain |
-| SDS | `docs/design/sds_dynamic_approval_workflow.md` | Architecture decisions — the "how" |
-| ADRs | `docs/design/adr/ADR-001..005*.md` | Key architecture decision records |
-| OMB | `docs/design/omb_dynamic_approval_workflow.md` | Field-level model/view/security specs |
-| ITM | `docs/design/itm_dynamic_approval_workflow.md` | Task manifest with dependency order |
+| Parent SRS | `dynamic_approval_workflow/docs/srs/baseline/dynamic_approval_workflow_srs_v1.3.md` | 95 FRs + 17 NFRs — the "what" |
+| Child SRS | `dynamic_approval_workflow/docs/srs/detailed/srs_01..srs_10_*.md` | Detailed requirements per domain |
+| SDS | `dynamic_approval_workflow/docs/design/sds_dynamic_approval_workflow.md` | Architecture decisions — the "how" |
+| ADRs | `dynamic_approval_workflow/docs/design/adr/ADR-001..005*.md` | Key architecture decision records |
+| OMB | `dynamic_approval_workflow/docs/design/omb/OMB-00-index.md` | Field-level model/view/security specs |
+| ITM | `dynamic_approval_workflow/docs/design/itm_dynamic_approval_workflow.md` | Task manifest with dependency order |
 | Lessons | `LESSONS.md` | Mistakes to never repeat |
 
 **Rule:** If a document specifies a field name, type, model structure, or pattern — use it exactly. Do not rename, restructure, or "improve" documented decisions.
