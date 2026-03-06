@@ -2,6 +2,7 @@ from . import workflow_definition
 from . import workflow_definition_version
 from . import workflow_definition_compiled
 from . import workflow_binding
+from . import workflow_binding_interceptor
 from . import workflow_binding_scope
 from . import workflow_enforcement_interceptor
 from . import workflow_instance

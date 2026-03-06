@@ -244,7 +244,7 @@ Model.field → DFR-XX-YYY → FR/NFR-ZZZ
 
 | Artifact | Path | Format |
 |---|---|---|
-| Blueprint document | `docs/design/omb_dynamic_approval_workflow.md` | Markdown |
+| Blueprint document | `docs/design/omb/OMB-00-index.md` (entrypoint to `OMB-01..07`) | Markdown |
 | Model relationship diagram | `docs/design/diagrams/model_erd.md` | Mermaid |
 
 ---

@@ -71,8 +71,7 @@ class WorkflowBindingScope(models.Model):
     def _validate_scope_domain_fields(self, domain_expression):
         self.ensure_one()
         target_model = self.binding_id.target_model
-        model_exists = self.env["ir.model"].sudo().search_count([("model", "=", target_model)])
-        if not model_exists:
+        if not (bool(target_model) and target_model in self.env):
             raise ValidationError(
                 _("Cannot validate scope domain: target model '%s' is not installed.") % target_model
             )
