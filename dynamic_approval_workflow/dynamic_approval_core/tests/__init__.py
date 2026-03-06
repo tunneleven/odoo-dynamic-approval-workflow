@@ -7,3 +7,4 @@ from . import test_workflow_runtime
 from . import test_workflow_task
 from . import test_workflow_idempotency
 from . import test_workflow_security
+from . import test_workflow_condition_follower_rule
