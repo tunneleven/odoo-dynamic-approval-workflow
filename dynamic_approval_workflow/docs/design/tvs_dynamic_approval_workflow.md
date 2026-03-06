@@ -19,7 +19,7 @@ Define the authoritative validation strategy for the `dynamic_approval_workflow`
 This document is the validation contract used with:
 
 1. `SDS` (`docs/design/sds_dynamic_approval_workflow.md`)
-2. `OMB` (`docs/design/omb_dynamic_approval_workflow.md`)
+2. `OMB` (`docs/design/omb/OMB-00-index.md`)
 3. `ITM` (`docs/design/itm_dynamic_approval_workflow.md`)
 4. `RTM` (`docs/design/rtm_dynamic_approval_workflow.md`)
 

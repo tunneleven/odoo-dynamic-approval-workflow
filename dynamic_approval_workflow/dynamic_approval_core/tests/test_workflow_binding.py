@@ -129,16 +129,74 @@ class TestWorkflowBinding(TransactionCase):
         self.assertEqual(validation_result.get("binding_id"), binding.id)
         self.assertTrue(validation_result.get("valid"))
 
-        binding.action_enable()
+        self.assertIs(binding.action_enable(), True)
         self.assertTrue(binding.is_active)
         self.assertEqual(binding.interceptor_config_revision, 1)
 
-        binding.action_disable()
+        self.assertIs(binding.action_disable(), True)
         self.assertFalse(binding.is_active)
         self.assertEqual(binding.interceptor_config_revision, 2)
 
         binding.write({"binding_priority": 300})
         self.assertEqual(binding.interceptor_config_revision, 3)
+
+    def test_execute_callback_resolves_execution_principal(self):
+        request_actor_binding = self._create_binding(
+            callback_model="res.partner",
+            callback_method="write",
+        )
+        request_result = request_actor_binding.execute_callback(
+            instance_id=11,
+            payload={},
+            idempotency_key="request-actor-key",
+        )
+        self.assertEqual(request_result["effective_execution_principal"], "request_actor")
+        self.assertEqual(request_result["effective_execution_user_id"], self.env.user.id)
+
+        approver_actor_binding = self._create_binding(
+            callback_model="res.partner",
+            callback_method="write",
+            callback_execution_principal="approver_actor",
+        )
+        with self.assertRaises(ValidationError):
+            approver_actor_binding.execute_callback(
+                instance_id=12,
+                payload={},
+                idempotency_key="approver-missing-user",
+            )
+
+        approver_result = approver_actor_binding.execute_callback(
+            instance_id=12,
+            payload={"effective_actor_user_id": self.service_user.id},
+            idempotency_key="approver-user-present",
+        )
+        self.assertEqual(approver_result["effective_execution_principal"], "approver_actor")
+        self.assertEqual(approver_result["effective_execution_user_id"], self.service_user.id)
+
+        service_principal_binding = self._create_binding(
+            callback_model="res.partner",
+            callback_method="write",
+            callback_execution_principal="service_principal",
+            callback_service_user_id=self.service_user.id,
+        )
+        service_result = service_principal_binding.execute_callback(
+            instance_id=13,
+            payload={},
+            idempotency_key="service-principal-key",
+        )
+        self.assertEqual(service_result["effective_execution_principal"], "service_principal")
+        self.assertEqual(service_result["effective_execution_user_id"], self.service_user.id)
+
+    def test_enabled_binding_target_fields_are_immutable_without_context_bypass(self):
+        binding = self._create_binding()
+        binding.action_enable()
+
+        with self.assertRaises(ValidationError):
+            binding.with_context(allow_active_target_write=True).write(
+                {
+                    "target_model": "res.users",
+                }
+            )
 
     def test_scope_value_required_by_scope_type(self):
         binding = self._create_binding()

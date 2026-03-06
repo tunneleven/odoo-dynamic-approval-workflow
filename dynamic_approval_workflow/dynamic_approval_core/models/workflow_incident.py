@@ -139,9 +139,9 @@ class WorkflowIncident(models.Model):
         Raises ValidationError if incident is not in a resolvable state.
         """
         for record in self:
-            if record.state in ("resolved", "closed_with_exception"):
+            if record.state not in ("triaged", "retry_scheduled"):
                 raise ValidationError(
-                    _("Resolved or closed incidents cannot be resolved again.")
+                    _("Only triaged or retry-scheduled incidents can be resolved.")
                 )
             record.write({
                 "state": "resolved",
@@ -152,12 +152,12 @@ class WorkflowIncident(models.Model):
     def action_close_with_exception(self):
         """Close incident with exception, reading note from resolution_note field.
 
-        Raises ValidationError if incident is already resolved or closed.
+        Raises ValidationError if incident is not resolved first.
         """
         for record in self:
-            if record.state in ("resolved", "closed_with_exception"):
+            if record.state != "resolved":
                 raise ValidationError(
-                    _("Resolved or closed incidents cannot be closed with exception.")
+                    _("Only resolved incidents can be closed with exception.")
                 )
             record.write({
                 "state": "closed_with_exception",
@@ -165,3 +165,7 @@ class WorkflowIncident(models.Model):
                 "resolved_at_utc": fields.Datetime.now(),
             })
         return True
+
+    def action_close(self):
+        """Compatibility alias for the incident close action."""
+        return self.action_close_with_exception()
