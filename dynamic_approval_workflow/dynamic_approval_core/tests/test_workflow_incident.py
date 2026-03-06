@@ -39,13 +39,29 @@ class TestWorkflowIncident(TransactionCase):
 
         incident.action_triage()
         incident.action_retry()
-        self.assertEqual(incident.state, "retry_scheduled")
-        self.assertEqual(incident.resolution_action, "retry")
+        self.assertEqual(
+            incident.state,
+            "retry_scheduled",
+            "Incident should move to 'retry_scheduled' after retry action from triaged state.",
+        )
+        self.assertEqual(
+            incident.resolution_action,
+            "retry",
+            "Resolution action should be 'retry' after retry action from triaged state.",
+        )
 
     def test_happy_path_triage_resolve_close(self):
         incident = self._new_incident()
         incident.action_triage()
         incident.action_resolve()
         incident.action_close()
-        self.assertEqual(incident.state, "closed_with_exception")
-        self.assertEqual(incident.resolution_action, "close_with_exception")
+        self.assertEqual(
+            incident.state,
+            "closed_with_exception",
+            "Incident should be in 'closed_with_exception' after close action on a resolved incident.",
+        )
+        self.assertEqual(
+            incident.resolution_action,
+            "close_with_exception",
+            "Resolution action should be 'close_with_exception' after close action on a resolved incident.",
+        )
