@@ -93,6 +93,24 @@ class TestWorkflowEnforcement(TransactionCase):
         self.assertNotIn(("workflow.incident", "action_resolve"), patched_keys)
         self.assertNotIn(("workflow.incident", "action_close_with_exception"), patched_keys)
 
+    def test_active_binding_create_auto_applies_interceptor_patch(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+
+        incident = self._create_incident()
+        with patch.object(
+            type(binding),
+            "evaluate_gate",
+            return_value={"state": "allowed", "reason_code": "allowed"},
+        ) as evaluate_gate:
+            incident.action_triage()
+
+        self.assertEqual(evaluate_gate.call_count, 1, "Active binding create must activate interceptor.")
+        self.assertEqual(incident.state, "triaged")
+
     def test_bypass_token_skips_gate_evaluation_and_allows_call(self):
         binding = self._create_binding(
             target_action_method="action_triage",
