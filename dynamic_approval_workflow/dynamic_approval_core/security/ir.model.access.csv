@@ -65,7 +65,7 @@ access_workflow_outbound_event_admin,workflow.outbound.event.admin,model_workflo
 access_workflow_outbound_event_auditor,workflow.outbound.event.auditor,model_workflow_outbound_event,group_workflow_auditor,1,0,0,0
 access_workflow_idempotency_registry_admin,workflow.idempotency.registry.admin,model_workflow_idempotency_registry,group_workflow_admin,1,1,1,1
 access_workflow_incident_approver,workflow.incident.approver,model_workflow_incident,group_workflow_approver,1,0,0,0
-access_workflow_incident_admin,workflow.incident.admin,model_workflow_incident,group_workflow_admin,1,1,1,1
+access_workflow_incident_admin,workflow.incident.admin,model_workflow_incident,group_workflow_admin,1,1,1,0
 access_workflow_incident_auditor,workflow.incident.auditor,model_workflow_incident,group_workflow_auditor,1,0,0,0
-access_workflow_audit_event_admin,workflow.audit.event.admin,model_workflow_audit_event,group_workflow_admin,1,1,1,0
+access_workflow_audit_event_admin,workflow.audit.event.admin,model_workflow_audit_event,group_workflow_admin,1,0,1,0
 access_workflow_audit_event_auditor,workflow.audit.event.auditor,model_workflow_audit_event,group_workflow_auditor,1,0,0,0
