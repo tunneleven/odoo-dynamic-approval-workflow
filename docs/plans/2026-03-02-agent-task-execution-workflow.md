@@ -2,6 +2,12 @@
 
 Purpose: provide one clear, repeatable workflow for agents to pick a task, implement safely, open PR, handle review, and move to the next task.
 
+## 0) Load This Workflow First (Mandatory)
+
+- Read this file at the start of every new task before selecting files, creating a branch, or making edits.
+- Treat this file as the default operational checklist for task execution.
+- Any automation or shell command that starts a task must explicitly instruct the agent to read this file first.
+
 ## 1) Preconditions
 
 - `gh` CLI authenticated (`gh auth status`).
@@ -25,6 +31,7 @@ gh issue list --state open --limit 100 \
 
 Open selected issue and extract:
 - `TASK-Px-yyy` ID
+- GitHub issue number
 - acceptance criteria
 - dependencies
 - files expected by ITM
@@ -32,6 +39,16 @@ Open selected issue and extract:
 ```bash
 gh issue view <issue_number> --json title,body,labels,url
 ```
+
+Immediately record the issue number and carry it through to PR creation:
+
+```bash
+export ISSUE_NUMBER=<issue_number>
+```
+
+Rule:
+- The same `ISSUE_NUMBER` from this step must be used in the PR body as the exact closing line `Closes #<issue_number>`.
+- Do not create a PR that references only `TASK-P...` without the matching issue-closing keyword.
 
 ## 3) Start Branch
 
@@ -125,6 +142,10 @@ PR body must include both:
 - `Task ID: TASK-Px-yyy`
 - Closing keyword: `Closes #<issue_number>`
 
+Non-negotiable:
+- The closing line must use the exact issue number from step 2.
+- If the PR already exists without `Closes #<issue_number>`, edit the PR body immediately before continuing review work.
+
 Template:
 
 ```markdown
@@ -162,6 +183,7 @@ gh pr view <pr_number> --json statusCheckRollup,mergeStateStatus,url
 If `PR Metadata Guard` fails:
 - Ensure PR body contains `TASK-P...` and `Closes #...` exactly.
 - Edit PR body and re-check.
+- Confirm the `Closes #...` issue number matches the task issue selected in step 2.
 
 ## 10) Handle Copilot Review (Required Loop)
 
@@ -221,5 +243,6 @@ Before merge, confirm:
 - Do not work directly on `main`.
 - Do not mix two tasks in one branch/PR.
 - Do not leave PR body without `TASK ID` + `Closes #...`.
+- Do not assume the task ID alone will close the issue.
 - Do not blindly accept/reject Copilot comments; always justify with repo context.
 - Do not skip local verification before pushing.
