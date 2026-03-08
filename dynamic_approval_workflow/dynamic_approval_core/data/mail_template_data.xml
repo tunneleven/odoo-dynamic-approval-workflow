@@ -1,6 +1,168 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
 
-    <!-- Placeholder for mail templates — populated during implementation -->
+    <record id="mail_template_task_assigned" model="mail.template">
+        <field name="name">Workflow: Task Assigned</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="subject">Approval Required: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.assignee_user_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>Hello ${object.assignee_user_id.name or 'Approver'},</p>
+                <p>You have been assigned an approval task.</p>
+                <ul>
+                    <li><strong>Task:</strong> ${object.name}</li>
+                    <li><strong>Workflow Instance:</strong> ${object.instance_id.name}</li>
+                    <li><strong>Workflow Definition:</strong> ${object.instance_id.definition_id.name}</li>
+                    <li><strong>SLA Due:</strong> ${object.sla_due_at_utc or 'No deadline set'}</li>
+                </ul>
+                <p>Please review and take action in Odoo.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_task_reminder" model="mail.template">
+        <field name="name">Workflow: Task Reminder</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="subject">Reminder: ${object.name} - Due ${object.sla_due_at_utc or 'Soon'}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.assignee_user_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>Hello ${object.assignee_user_id.name or 'Approver'},</p>
+                <p>This is a reminder for a pending approval task.</p>
+                <ul>
+                    <li><strong>Task:</strong> ${object.name}</li>
+                    <li><strong>Status:</strong> ${object.status}</li>
+                    <li><strong>SLA Due:</strong> ${object.sla_due_at_utc or 'No deadline set'}</li>
+                </ul>
+                <p>Please complete the task before the deadline.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_task_escalated" model="mail.template">
+        <field name="name">Workflow: Task Escalated</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="subject">Escalation: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.assignee_user_id.email or object.instance_id.requester_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>The following approval task has been escalated.</p>
+                <ul>
+                    <li><strong>Task:</strong> ${object.name}</li>
+                    <li><strong>Assignee:</strong> ${object.assignee_user_id.name or 'Unassigned'}</li>
+                    <li><strong>Workflow Instance:</strong> ${object.instance_id.name}</li>
+                </ul>
+                <p>Please review the escalation and take the next action.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_task_completed" model="mail.template">
+        <field name="name">Workflow: Task Completed</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="subject">Completed: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.instance_id.requester_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>A workflow task has been completed.</p>
+                <ul>
+                    <li><strong>Task:</strong> ${object.name}</li>
+                    <li><strong>Decision:</strong> ${object.decision or 'No decision recorded'}</li>
+                    <li><strong>Completed At:</strong> ${object.completed_at_utc or 'Just now'}</li>
+                </ul>
+                <p>You can review the workflow instance in Odoo for full details.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_instance_approved" model="mail.template">
+        <field name="name">Workflow: Instance Approved</field>
+        <field name="model_id" ref="model_workflow_instance"/>
+        <field name="subject">Approved: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.requester_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>Hello ${object.requester_id.name or 'Requester'},</p>
+                <p>Your workflow instance has been approved.</p>
+                <ul>
+                    <li><strong>Workflow Instance:</strong> ${object.name}</li>
+                    <li><strong>Definition:</strong> ${object.definition_id.name}</li>
+                    <li><strong>State:</strong> ${object.state}</li>
+                </ul>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_instance_rejected" model="mail.template">
+        <field name="name">Workflow: Instance Rejected</field>
+        <field name="model_id" ref="model_workflow_instance"/>
+        <field name="subject">Rejected: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.requester_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>Hello ${object.requester_id.name or 'Requester'},</p>
+                <p>Your workflow instance has been rejected.</p>
+                <ul>
+                    <li><strong>Workflow Instance:</strong> ${object.name}</li>
+                    <li><strong>Definition:</strong> ${object.definition_id.name}</li>
+                    <li><strong>State:</strong> ${object.state}</li>
+                </ul>
+                <p>Please review the underlying business record and resubmit if appropriate.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_sla_warning" model="mail.template">
+        <field name="name">Workflow: SLA Warning</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="subject">SLA Warning: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.assignee_user_id.email or object.instance_id.requester_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>This approval task is approaching its SLA deadline.</p>
+                <ul>
+                    <li><strong>Task:</strong> ${object.name}</li>
+                    <li><strong>Status:</strong> ${object.status}</li>
+                    <li><strong>SLA Due:</strong> ${object.sla_due_at_utc or 'No deadline set'}</li>
+                </ul>
+                <p>Please act before the deadline is breached.</p>
+            </div>
+        </field>
+    </record>
+
+    <record id="mail_template_sla_breached" model="mail.template">
+        <field name="name">Workflow: SLA Breached</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="subject">SLA Breached: ${object.name}</field>
+        <field name="email_from">${object.company_id.email or 'noreply@example.com'}</field>
+        <field name="email_to">${object.assignee_user_id.email or object.instance_id.requester_id.email or ''}</field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html" type="html">
+            <div>
+                <p>The SLA deadline for this approval task has been breached.</p>
+                <ul>
+                    <li><strong>Task:</strong> ${object.name}</li>
+                    <li><strong>Status:</strong> ${object.status}</li>
+                    <li><strong>SLA Due:</strong> ${object.sla_due_at_utc or 'No deadline set'}</li>
+                </ul>
+                <p>Immediate follow-up is required.</p>
+            </div>
+        </field>
+    </record>
 
 </odoo>
