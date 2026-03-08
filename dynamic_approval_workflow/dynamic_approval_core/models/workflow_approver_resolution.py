@@ -84,6 +84,7 @@ class WorkflowApproverResolution(models.Model):
 
     @api.constrains(
         "resolution_type",
+        "fallback_type",
         "user_ids",
         "group_id",
         "field_path",
@@ -100,7 +101,9 @@ class WorkflowApproverResolution(models.Model):
                 if not record.field_path:
                     raise ValidationError(_("Field Path is required when type is 'field'."))
                 record._validate_field_path()
-            if record.resolution_type == "hierarchy" and not 1 <= (record.hierarchy_levels or 0) <= 5:
+            if (
+                record.resolution_type == "hierarchy" or record.fallback_type == "fallback_hierarchy_level"
+            ) and not 1 <= (record.hierarchy_levels or 0) <= 5:
                 raise ValidationError(_("Hierarchy Levels must be between 1 and 5."))
 
     @api.constrains("quorum_mode", "quorum_count", "quorum_percentage")
@@ -145,7 +148,12 @@ class WorkflowApproverResolution(models.Model):
     def resolve_approvers(self, instance_id, context=None):
         """Resolve approvers for one or more ordered rules."""
         instance = self._resolve_instance(instance_id)
+        context = dict(context or {})
         ordered_rules = self.sorted(lambda rule: (rule.sequence, rule.id))
+        if not ordered_rules:
+            self._create_missing_rule_incident(instance, context=context)
+            return self.env["res.users"]
+
         resolved_ids = []
         seen_ids = set()
 
@@ -158,7 +166,7 @@ class WorkflowApproverResolution(models.Model):
                 resolved_ids.append(user.id)
 
         resolved_users = self.env["res.users"].browse(resolved_ids)
-        if not resolved_users and ordered_rules:
+        if not resolved_users:
             ordered_rules[0]._create_no_approver_incident(instance, context=context)
         return resolved_users
 
@@ -273,8 +281,13 @@ class WorkflowApproverResolution(models.Model):
         self.ensure_one()
         target_record = self._get_instance_target_record(instance)
         current = target_record
+        segments = self._field_path_segments()
 
-        for field_name in self._field_path_segments():
+        for index, field_name in enumerate(segments):
+            if not isinstance(current, models.BaseModel):
+                raise WorkflowConfigurationError(
+                    _("Field Path '%(path)s' must traverse relational fields only.") % {"path": self.field_path}
+                )
             if field_name not in current._fields:
                 raise WorkflowConfigurationError(
                     _("Field Path '%(path)s' contains invalid segment '%(segment)s'.")
@@ -283,7 +296,24 @@ class WorkflowApproverResolution(models.Model):
             current = current.mapped(field_name)
             if not current:
                 return self.env["res.users"]
+            if isinstance(current, models.BaseModel):
+                continue
 
+            if index < len(segments) - 1:
+                raise WorkflowConfigurationError(
+                    _("Field Path '%(path)s' segment '%(segment)s' must be relational.")
+                    % {"path": self.field_path, "segment": field_name}
+                )
+            raise WorkflowConfigurationError(
+                _("Field Path '%(path)s' must end on a user-compatible relational field.")
+                % {"path": self.field_path}
+            )
+
+        if current._name not in {"res.users", "res.partner"}:
+            raise WorkflowConfigurationError(
+                _("Field Path '%(path)s' must end on a user-compatible relational field.")
+                % {"path": self.field_path}
+            )
         return self._coerce_records_to_users(current)
 
     def _resolve_users_from_hierarchy(self, requester, levels=None):
@@ -356,6 +386,23 @@ class WorkflowApproverResolution(models.Model):
             instance.write({"state": "error_incident"})
         return incident
 
+    def _create_missing_rule_incident(self, instance, context=None):
+        """Create an incident when a node has no approver-resolution rules at all."""
+        node_id = (context or {}).get("step_id") or (context or {}).get("node_id") or _("unknown")
+        incident_vals = {
+            "instance_id": instance.id,
+            "category": "resolution_failure",
+            "severity": "high",
+            "reason_code": "no_approver_resolved",
+            "description": _("No approver resolution rules found for node '%(node)s'.") % {"node": node_id},
+            "correlation_id": instance.correlation_id,
+            "company_id": instance.company_id.id,
+        }
+        incident = self.env["workflow.incident"].create(incident_vals)
+        if instance.state != "error_incident":
+            instance.write({"state": "error_incident"})
+        return incident
+
     def _resolve_instance(self, instance_id):
         """Return a workflow.instance record from an ID or record."""
         if isinstance(instance_id, models.BaseModel):
@@ -380,13 +427,13 @@ class WorkflowApproverResolution(models.Model):
     def _validate_field_path(self):
         """Validate field-path syntax that is independent of runtime context."""
         self.ensure_one()
-        if any(not segment.strip() for segment in self._field_path_segments()):
+        if any(not segment for segment in self._field_path_segments()):
             raise ValidationError(_("Field Path cannot contain blank path segments."))
 
     def _field_path_segments(self):
-        """Return normalized non-empty field path segments."""
+        """Return normalized field path segments."""
         self.ensure_one()
-        return [segment for segment in (self.field_path or "").split(".") if segment]
+        return [segment.strip() for segment in (self.field_path or "").split(".")]
 
     def _parse_separation_of_duty_rule(self):
         """Parse the SoD JSON configuration."""

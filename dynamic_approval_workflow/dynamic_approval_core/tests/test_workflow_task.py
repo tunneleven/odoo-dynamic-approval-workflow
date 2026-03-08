@@ -2,6 +2,8 @@ from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
+from ..exceptions import WorkflowConfigurationError
+
 
 @tagged("post_install", "-at_install")
 class TestWorkflowApproverResolution(TransactionCase):
@@ -118,6 +120,14 @@ class TestWorkflowApproverResolution(TransactionCase):
                 )
             )
 
+        with self.assertRaises(ValidationError):
+            self.env["workflow.approver.resolution"].create(
+                self._new_rule_vals(
+                    fallback_type="fallback_hierarchy_level",
+                    hierarchy_levels=0,
+                )
+            )
+
     def test_resolve_approvers_returns_named_users_deterministically(self):
         """TC-FR-031-001: fixed users resolve in deterministic order."""
         rule = self.env["workflow.approver.resolution"].create(
@@ -169,6 +179,31 @@ class TestWorkflowApproverResolution(TransactionCase):
             [self.field_user.id],
             "Field-path resolution must return the user referenced on the business record.",
         )
+
+    def test_resolve_approvers_rejects_invalid_field_path_shapes(self):
+        """Runtime field-path validation must fail closed on non-relational paths."""
+        scalar_terminal_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="Scalar Terminal Field Path",
+                resolution_type="field",
+                user_ids=[(5, 0, 0)],
+                field_path="name",
+            )
+        )
+        scalar_intermediate_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="Scalar Intermediate Field Path",
+                resolution_type="field",
+                user_ids=[(5, 0, 0)],
+                field_path="name.user_ids",
+            )
+        )
+
+        with self.assertRaises(WorkflowConfigurationError):
+            scalar_terminal_rule.resolve_approvers(self.instance_with_user.id)
+
+        with self.assertRaises(WorkflowConfigurationError):
+            scalar_intermediate_rule.resolve_approvers(self.instance_with_user.id)
 
     def test_resolve_approvers_uses_sequence_priority_for_multiple_rules(self):
         """Multiple rules must resolve in sequence order with duplicate collapse."""
@@ -222,6 +257,35 @@ class TestWorkflowApproverResolution(TransactionCase):
             incident_model.search_count([]),
             incident_count,
             "Successful fallback must not create an incident.",
+        )
+
+    def test_empty_rule_set_creates_no_approver_incident(self):
+        """Missing rule rows must still produce the documented no-approver incident."""
+        approvers = self.env["workflow.approver.resolution"].browse().resolve_approvers(
+            self.instance_without_user.id,
+            context={"step_id": "UserTask_Missing"},
+        )
+        incident = self.env["workflow.incident"].search(
+            [
+                ("instance_id", "=", self.instance_without_user.id),
+                ("category", "=", "resolution_failure"),
+                ("reason_code", "=", "no_approver_resolved"),
+            ],
+            order="id desc",
+            limit=1,
+        )
+
+        self.assertFalse(approvers, "Empty rule sets must resolve no approvers.")
+        self.assertTrue(incident, "Missing rule rows must create a no-approver incident.")
+        self.assertIn(
+            "UserTask_Missing",
+            incident.description,
+            "Missing-rule incidents must include the provided step identifier.",
+        )
+        self.assertEqual(
+            self.instance_without_user.state,
+            "error_incident",
+            "Missing-rule resolution must push the workflow instance into error_incident state.",
         )
 
     def test_no_approver_resolution_creates_incident(self):
