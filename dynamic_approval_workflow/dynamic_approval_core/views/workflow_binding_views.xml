@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ======== Tree ======== -->
-    <record id="workflow_binding_view_list" model="ir.ui.view">
+    <record id="view_workflow_binding_list" model="ir.ui.view">
         <field name="name">workflow.binding.list</field>
         <field name="model">workflow.binding</field>
         <field name="arch" type="xml">
@@ -11,24 +10,44 @@
                 <field name="definition_id"/>
                 <field name="target_model"/>
                 <field name="target_action_method"/>
-                <field name="enforcement_mode"/>
-                <field name="is_active"/>
+                <field name="enforcement_mode" widget="badge"/>
+                <field name="is_active" widget="boolean_toggle"/>
                 <field name="company_id" groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
 
-    <!-- ======== Form ======== -->
-    <record id="workflow_binding_view_form" model="ir.ui.view">
+    <record id="view_workflow_binding_form" model="ir.ui.view">
         <field name="name">workflow.binding.form</field>
         <field name="model">workflow.binding</field>
         <field name="arch" type="xml">
             <form>
+                <header>
+                    <button name="action_validate"
+                            type="object"
+                            string="Validate"
+                            class="btn-primary"/>
+                    <button name="action_enable"
+                            type="object"
+                            string="Enable"
+                            invisible="is_active"/>
+                    <button name="action_disable"
+                            type="object"
+                            string="Disable"
+                            invisible="not is_active"/>
+                </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(dynamic_approval_core.workflow_instance_action)d"
+                                type="action"
+                                class="oe_stat_button"
+                                icon="fa-sitemap"
+                                string="Instances"/>
+                    </div>
                     <div class="oe_title">
                         <h1><field name="name" placeholder="Binding Name"/></h1>
                     </div>
-                    <group>
+                    <group string="Binding Target">
                         <group>
                             <field name="definition_id"/>
                             <field name="target_model"/>
@@ -38,16 +57,33 @@
                             <field name="enforcement_mode"/>
                             <field name="compliance_critical"/>
                             <field name="is_active"/>
-                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="binding_priority"/>
+                            <field name="company_id"/>
                         </group>
                     </group>
-                    <group string="Post-Approval Callback">
-                        <field name="callback_model"/>
-                        <field name="callback_method"/>
-                    </group>
                     <notebook>
-                        <page string="Rollout Scopes">
-                            <field name="scope_ids"/>
+                        <page string="Scopes">
+                            <field name="scope_ids">
+                                <list editable="bottom">
+                                    <field name="scope_type"/>
+                                    <field name="scope_company_id"/>
+                                    <field name="scope_group_id"/>
+                                    <field name="scope_domain"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Callback">
+                            <group>
+                                <field name="callback_model"/>
+                                <field name="callback_method"/>
+                                <field name="callback_execution_principal"/>
+                                <field name="callback_service_user_id"
+                                       invisible="callback_execution_principal != 'service_principal'"/>
+                                <field name="callback_idempotency_policy"/>
+                            </group>
+                        </page>
+                        <page string="Warning">
+                            <field name="ui_warning_message"/>
                         </page>
                     </notebook>
                 </sheet>
@@ -56,11 +92,34 @@
         </field>
     </record>
 
-    <!-- ======== Action ======== -->
-    <record id="workflow_binding_action" model="ir.actions.act_window">
+    <record id="view_workflow_binding_search" model="ir.ui.view">
+        <field name="name">workflow.binding.search</field>
+        <field name="model">workflow.binding</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="target_model"/>
+                <field name="definition_id"/>
+                <field name="enforcement_mode"/>
+                <filter name="active_bindings"
+                        string="Active"
+                        domain="[('is_active', '=', True)]"/>
+                <filter name="compliance_critical"
+                        string="Compliance Critical"
+                        domain="[('compliance_critical', '=', True)]"/>
+                <filter name="group_by_enforcement_mode"
+                        string="By Enforcement"
+                        context="{'group_by': 'enforcement_mode'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_workflow_binding" model="ir.actions.act_window">
         <field name="name">Workflow Bindings</field>
         <field name="res_model">workflow.binding</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_workflow_binding_search"/>
+        <field name="group_ids" eval="[(6, 0, [ref('dynamic_approval_core.group_workflow_designer')])]"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Bind a workflow to a model action
