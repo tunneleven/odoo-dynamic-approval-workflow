@@ -76,7 +76,7 @@
                 <p>A workflow task has been completed.</p>
                 <ul>
                     <li><strong>Task:</strong> ${object.name}</li>
-                    <li><strong>Decision:</strong> ${object.decision or 'No decision recorded'}</li>
+                    <li><strong>Decision:</strong> ${object._fields['decision'].convert_to_export(object.decision, object) or 'No decision recorded'}</li>
                     <li><strong>Completed At:</strong> ${object.completed_at_utc or 'Just now'}</li>
                 </ul>
                 <p>You can review the workflow instance in Odoo for full details.</p>
