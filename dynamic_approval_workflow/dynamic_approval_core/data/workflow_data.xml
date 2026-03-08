@@ -2,24 +2,39 @@
 <odoo noupdate="1">
 
     <!-- Default configuration parameters -->
-    <record id="config_param_lock_timeout" model="ir.config_parameter">
-        <field name="key">dynamic_approval.lock_timeout_ms</field>
+    <record id="param_lock_timeout_ms" model="ir.config_parameter">
+        <field name="key">daw.lock_timeout_ms</field>
         <field name="value">10000</field>
     </record>
 
-    <record id="config_param_lock_retries" model="ir.config_parameter">
-        <field name="key">dynamic_approval.lock_retries</field>
+    <record id="param_lock_retry_count" model="ir.config_parameter">
+        <field name="key">daw.lock_retry_count</field>
         <field name="value">3</field>
     </record>
 
-    <record id="config_param_idempotency_ttl_days" model="ir.config_parameter">
-        <field name="key">dynamic_approval.idempotency_ttl_days</field>
+    <record id="param_lock_backoff_base_ms" model="ir.config_parameter">
+        <field name="key">daw.lock_backoff_base_ms</field>
+        <field name="value">100</field>
+    </record>
+
+    <record id="param_grant_default_ttl_hours" model="ir.config_parameter">
+        <field name="key">daw.grant_default_ttl_hours</field>
+        <field name="value">24</field>
+    </record>
+
+    <record id="param_idempotency_ttl_days" model="ir.config_parameter">
+        <field name="key">daw.idempotency_ttl_days</field>
         <field name="value">90</field>
     </record>
 
-    <record id="config_param_grant_ttl_hours" model="ir.config_parameter">
-        <field name="key">dynamic_approval.grant_default_ttl_hours</field>
-        <field name="value">24</field>
+    <record id="param_viewer_poll_interval_ms" model="ir.config_parameter">
+        <field name="key">daw.viewer_poll_interval_ms</field>
+        <field name="value">5000</field>
+    </record>
+
+    <record id="param_interceptor_cache_ttl_s" model="ir.config_parameter">
+        <field name="key">daw.interceptor_cache_ttl_s</field>
+        <field name="value">60</field>
     </record>
 
 </odoo>
