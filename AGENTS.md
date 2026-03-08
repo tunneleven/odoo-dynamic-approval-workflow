@@ -2,7 +2,7 @@
 
 > Canonical instruction file for AI coding agents (OpenAI Codex, GitHub Copilot, Claude).
 > Synced with `.github/copilot-instructions.md`. If they conflict, this file wins.
-> Last updated: 2026-03-02
+> Last updated: 2026-03-08
 
 ---
 
@@ -27,9 +27,11 @@ Never invent architecture. Every decision is already documented:
 | ADRs | `dynamic_approval_workflow/docs/design/adr/ADR-001..005*.md` | Key architecture decision records |
 | OMB | `dynamic_approval_workflow/docs/design/omb/OMB-00-index.md` | Field-level model/view/security specs |
 | ITM | `dynamic_approval_workflow/docs/design/itm_dynamic_approval_workflow.md` | Task manifest with dependency order |
+| Agent task workflow | `docs/plans/2026-03-02-agent-task-execution-workflow.md` | Default task-start, branch, PR, and IssueOps execution checklist |
 | Lessons | `LESSONS.md` | Mistakes to never repeat |
 
 **Rule:** If a document specifies a field name, type, model structure, or pattern — use it exactly. Do not rename, restructure, or "improve" documented decisions.
+**Task-start rule:** On every new task, read `docs/plans/2026-03-02-agent-task-execution-workflow.md` before creating a branch, editing files, or opening a PR. Treat it as the default operational checklist.
 
 ## 3. Module Boundaries (ADR-001)
 
@@ -312,7 +314,7 @@ FR/NFR → DFR → SDS Section → OMB Spec → ITM TASK → Source File → Tes
 **In practice:**
 - Model file headers do NOT need traceability comments (the OMB provides this mapping).
 - Test methods SHOULD reference the requirement: `# Validates FR-008: gate enforcement on action_confirm`.
-- PR descriptions MUST include: `TASK-XXX`, affected `FR/NFR` IDs, and verification evidence.
+- PR descriptions MUST include: `TASK-XXX`, exact closing keyword `Closes #<issue_number>`, affected `FR/NFR` IDs, and verification evidence.
 - Before creating any PR, ALWAYS run a Codex code review on the branch diff and resolve critical/high findings (or document explicit rationale for accepted risk in the PR body).
 
 ## 14. Failure Recovery Protocol

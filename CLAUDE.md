@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Read first (authoritative sources)
 
 - `AGENTS.md` is the canonical instruction file for this repo. If anything conflicts, follow `AGENTS.md`.
+- At task start, read `docs/plans/2026-03-02-agent-task-execution-workflow.md` and use it as the default execution checklist.
 - Read `LESSONS.md` before implementing changes.
 - Architecture and requirements are defined in:
   - `dynamic_approval_workflow/docs/srs/baseline/dynamic_approval_workflow_srs_v1.3.md`
@@ -96,6 +97,6 @@ cd dynamic_approval_workflow
 - Before creating any PR, run a Codex review on the branch diff and resolve CRITICAL/HIGH findings (or document accepted-risk rationale in the PR body).
 - PR body must include both:
   - a `TASK-P...` identifier
-  - a closing keyword such as `Closes #123`
+  - the exact closing keyword line for the task issue, such as `Closes #123`
 - Expected verification evidence in PRs includes:
   - `py_compile`, module install, module tests, `ruff`, `pre-commit`.

@@ -85,7 +85,7 @@ python3 scripts/agent_queue_worker.py \
   --assignee tunneleven \
   --include-either \
   --poll-seconds 90 \
-  --start-command 'codex run "Resolve {task_id} from issue #{issue_number}: {issue_title}"'
+  --start-command 'codex run "Before doing anything else, read docs/plans/2026-03-02-agent-task-execution-workflow.md and follow it as the default task checklist. Then resolve {task_id} from issue #{issue_number}: {issue_title}. Issue URL: {issue_url}"'
 ```
 
 Supported placeholders in `--start-command`:
