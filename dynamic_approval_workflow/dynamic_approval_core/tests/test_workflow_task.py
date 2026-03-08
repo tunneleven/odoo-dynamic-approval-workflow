@@ -275,6 +275,54 @@ class TestWorkflowApproverResolution(TransactionCase):
             "Sequence order must determine the combined approver order across matching rules.",
         )
 
+    def test_resolve_approvers_requires_step_id_for_mixed_node_rule_sets(self):
+        """Mixed-node recordsets must require an explicit step identifier."""
+        first_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="First Node Rule",
+                node_id="UserTask_1",
+                user_ids=[(6, 0, [self.fixed_user.id])],
+            )
+        )
+        second_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="Second Node Rule",
+                node_id="UserTask_2",
+                user_ids=[(6, 0, [self.fallback_user.id])],
+            )
+        )
+
+        with self.assertRaises(WorkflowConfigurationError):
+            (first_rule | second_rule).resolve_approvers(self.instance_with_user.id)
+
+    def test_resolve_approvers_scopes_to_requested_step_id(self):
+        """Step-aware resolution must ignore rules for unrelated nodes."""
+        first_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="First Node Rule",
+                node_id="UserTask_1",
+                user_ids=[(6, 0, [self.fixed_user.id])],
+            )
+        )
+        second_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="Second Node Rule",
+                node_id="UserTask_2",
+                user_ids=[(6, 0, [self.fallback_user.id])],
+            )
+        )
+
+        approvers = (first_rule | second_rule).resolve_approvers(
+            self.instance_with_user.id,
+            context={"step_id": "UserTask_2"},
+        )
+
+        self.assertEqual(
+            approvers.ids,
+            [self.fallback_user.id],
+            "Step-aware resolution must only return approvers for the requested node.",
+        )
+
     def test_fallback_named_users_used_when_primary_resolution_is_empty(self):
         """Configured fallback users must be used before incident creation."""
         incident_model = self.env["workflow.incident"]
@@ -324,8 +372,8 @@ class TestWorkflowApproverResolution(TransactionCase):
         with self.assertRaises(WorkflowSecurityPolicyError):
             rule.resolve_approvers(self_request_instance.id)
 
-    def test_delegate_rule_resolves_active_delegate_at_valid_to_boundary(self):
-        """Delegate rules must resolve active delegates through the public API."""
+    def test_delegate_rule_excludes_delegate_at_valid_to_boundary(self):
+        """Delegation end timestamps must be exclusive during approver resolution."""
         boundary_now = fields.Datetime.now()
         self.env["workflow.delegation.record"].create(
             {
@@ -356,10 +404,15 @@ class TestWorkflowApproverResolution(TransactionCase):
         with patch("odoo.fields.Datetime.now", return_value=boundary_now):
             approvers = (source_rule | delegate_rule).resolve_approvers(self.instance_with_user.id)
 
-        self.assertIn(
+        self.assertNotIn(
             self.fallback_user.id,
             approvers.ids,
-            "Delegate rules must resolve active delegations without hidden caller context.",
+            "Delegations must be inactive once approver resolution reaches valid_to.",
+        )
+        self.assertIn(
+            self.fixed_user.id,
+            approvers.ids,
+            "Expired delegations must leave the original resolved approver in place.",
         )
 
     def test_empty_rule_set_creates_no_approver_incident(self):

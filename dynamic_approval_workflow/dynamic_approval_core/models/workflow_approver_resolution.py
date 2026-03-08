@@ -149,7 +149,7 @@ class WorkflowApproverResolution(models.Model):
         """Resolve approvers for one or more ordered rules."""
         instance = self._resolve_instance(instance_id)
         context = dict(context or {})
-        ordered_rules = self.sorted(lambda rule: (rule.sequence, rule.id))
+        ordered_rules = self._scoped_rules_for_context(context).sorted(lambda rule: (rule.sequence, rule.id))
         if not ordered_rules:
             self._create_missing_rule_incident(instance, context=context)
             return self.env["res.users"]
@@ -375,7 +375,7 @@ class WorkflowApproverResolution(models.Model):
             ("delegator_id", "in", delegator_users.ids),
             ("company_id", "=", instance.company_id.id),
             ("valid_from", "<=", now),
-            ("valid_to", ">=", now),
+            ("valid_to", ">", now),
             "|",
             ("definition_id", "=", False),
             ("definition_id", "=", instance.definition_id.id),
@@ -439,6 +439,17 @@ class WorkflowApproverResolution(models.Model):
             )
             % {"node": self.node_id or instance.id}
         )
+
+    def _scoped_rules_for_context(self, context):
+        """Scope rules to the requested step when the caller provides one."""
+        step_id = (context or {}).get("step_id") or (context or {}).get("node_id")
+        if step_id:
+            return self.filtered(lambda rule: rule.node_id == step_id)
+        if len(set(self.mapped("node_id"))) > 1:
+            raise WorkflowConfigurationError(
+                _("Approver resolution requires a step_id or node_id when multiple nodes are present.")
+            )
+        return self
 
     def _resolve_instance(self, instance_id):
         """Return a workflow.instance record from an ID or record."""

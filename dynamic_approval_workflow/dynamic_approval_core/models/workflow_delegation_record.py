@@ -46,5 +46,5 @@ class WorkflowDelegationRecord(models.Model):
             record.is_active = bool(
                 record.valid_from
                 and record.valid_to
-                and record.valid_from <= now <= record.valid_to
+                and record.valid_from <= now < record.valid_to
             )
