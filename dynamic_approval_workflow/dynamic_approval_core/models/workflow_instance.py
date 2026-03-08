@@ -87,6 +87,4 @@ class WorkflowInstance(models.Model):
 
     def _compute_name(self):
         for record in self:
-            record.name = (
-                f"{record.definition_id.name or ''} #{record.id or 'new'}"
-            )
+            record.name = f"{record.definition_id.name or ''} #{record.id or 'new'}"

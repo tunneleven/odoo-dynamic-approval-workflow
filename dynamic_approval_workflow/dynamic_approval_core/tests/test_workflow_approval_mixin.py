@@ -59,27 +59,19 @@ class TestWorkflowApprovalMixin(TransactionCase):
 
     def test_derive_approval_state_maps_runtime_states(self):
         self.assertEqual(
-            WorkflowApprovalMixin._derive_approval_state(
-                [SimpleNamespace(state="running")]
-            ),
+            WorkflowApprovalMixin._derive_approval_state([SimpleNamespace(state="running")]),
             "pending",
         )
         self.assertEqual(
-            WorkflowApprovalMixin._derive_approval_state(
-                [SimpleNamespace(state="completed_approved")]
-            ),
+            WorkflowApprovalMixin._derive_approval_state([SimpleNamespace(state="completed_approved")]),
             "approved",
         )
         self.assertEqual(
-            WorkflowApprovalMixin._derive_approval_state(
-                [SimpleNamespace(state="completed_rejected")]
-            ),
+            WorkflowApprovalMixin._derive_approval_state([SimpleNamespace(state="completed_rejected")]),
             "rejected",
         )
         self.assertEqual(
-            WorkflowApprovalMixin._derive_approval_state(
-                [SimpleNamespace(state="cancelled")]
-            ),
+            WorkflowApprovalMixin._derive_approval_state([SimpleNamespace(state="cancelled")]),
             "none",
         )
 
@@ -111,9 +103,7 @@ class TestWorkflowApprovalMixin(TransactionCase):
         binding_model.sudo.return_value = binding_model
         binding_model.search.return_value = False
 
-        record = _FakeRecord(
-            _FakeEnv({"workflow.binding": binding_model}, company_id=11, user_id=23)
-        )
+        record = _FakeRecord(_FakeEnv({"workflow.binding": binding_model}, company_id=11, user_id=23))
 
         result = WorkflowApprovalMixin._check_approval_gate(record, "action_submit")
 
@@ -132,9 +122,7 @@ class TestWorkflowApprovalMixin(TransactionCase):
         }
         binding_model.search.return_value = binding
 
-        record = _FakeRecord(
-            _FakeEnv({"workflow.binding": binding_model}, company_id=11, user_id=23)
-        )
+        record = _FakeRecord(_FakeEnv({"workflow.binding": binding_model}, company_id=11, user_id=23))
 
         with self.assertRaisesRegex(
             WorkflowGateBlockedError,

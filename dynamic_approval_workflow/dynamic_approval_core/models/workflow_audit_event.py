@@ -69,18 +69,14 @@ class WorkflowAuditEvent(models.Model):
     # security remains fail-closed and ACLs do not contradict model logic.
     def write(self, vals):
         """Blocked — audit events are immutable."""
-        raise WorkflowIntegrityError(
-            _("Audit events are immutable and cannot be modified.")
-        )
+        raise WorkflowIntegrityError(_("Audit events are immutable and cannot be modified."))
 
     # SECURITY: Deletion is blocked at the model layer to guarantee that
     # audit evidence is append-only. ACL perm_unlink must not be relied
     # upon to allow deletions for this model.
     def unlink(self):
         """Blocked — audit events are never deleted."""
-        raise WorkflowIntegrityError(
-            _("Audit events are immutable and cannot be deleted.")
-        )
+        raise WorkflowIntegrityError(_("Audit events are immutable and cannot be deleted."))
 
     @api.model
     def log_event(
@@ -103,9 +99,7 @@ class WorkflowAuditEvent(models.Model):
         if payload is not None:
             payload_str = json.dumps(payload, sort_keys=True, default=str)
             vals["payload"] = payload_str
-            vals["payload_hash"] = hashlib.sha256(
-                payload_str.encode("utf-8")
-            ).hexdigest()
+            vals["payload_hash"] = hashlib.sha256(payload_str.encode("utf-8")).hexdigest()
         if correlation_id:
             vals["correlation_id"] = correlation_id
         if causation_id:

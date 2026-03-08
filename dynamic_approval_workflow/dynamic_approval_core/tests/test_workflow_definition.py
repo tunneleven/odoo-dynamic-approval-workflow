@@ -20,35 +20,47 @@ class TestWorkflowDefinition(TransactionCase):
         cls.other_company = cls.env["res.company"].create({"name": "Other Company"})
         cls.group_designer = cls.env.ref("dynamic_approval_core.group_workflow_designer")
         cls.group_approver = cls.env.ref("dynamic_approval_core.group_workflow_approver")
-        cls.designer_user = cls.env["res.users"].with_context(no_reset_password=True).create(
-            {
-                "name": "Designer User",
-                "login": "designer_user@example.com",
-                "email": "designer_user@example.com",
-                "group_ids": [(6, 0, [cls.group_designer.id])],
-                "company_id": cls.env.company.id,
-                "company_ids": [(6, 0, [cls.env.company.id])],
-            }
+        cls.designer_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Designer User",
+                    "login": "designer_user@example.com",
+                    "email": "designer_user@example.com",
+                    "group_ids": [(6, 0, [cls.group_designer.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
         )
-        cls.other_designer_user = cls.env["res.users"].with_context(no_reset_password=True).create(
-            {
-                "name": "Other Designer User",
-                "login": "designer_user_other@example.com",
-                "email": "designer_user_other@example.com",
-                "group_ids": [(6, 0, [cls.group_designer.id])],
-                "company_id": cls.other_company.id,
-                "company_ids": [(6, 0, [cls.other_company.id])],
-            }
+        cls.other_designer_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Other Designer User",
+                    "login": "designer_user_other@example.com",
+                    "email": "designer_user_other@example.com",
+                    "group_ids": [(6, 0, [cls.group_designer.id])],
+                    "company_id": cls.other_company.id,
+                    "company_ids": [(6, 0, [cls.other_company.id])],
+                }
+            )
         )
-        cls.approver_user = cls.env["res.users"].with_context(no_reset_password=True).create(
-            {
-                "name": "Approver User",
-                "login": "approver_user@example.com",
-                "email": "approver_user@example.com",
-                "group_ids": [(6, 0, [cls.group_approver.id])],
-                "company_id": cls.env.company.id,
-                "company_ids": [(6, 0, [cls.env.company.id])],
-            }
+        cls.approver_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Approver User",
+                    "login": "approver_user@example.com",
+                    "email": "approver_user@example.com",
+                    "group_ids": [(6, 0, [cls.group_approver.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
         )
         cls.definition = cls.env["workflow.definition"].create(
             {
@@ -125,18 +137,24 @@ class TestWorkflowDefinition(TransactionCase):
             }
         )
 
-        visible_for_main_designer = self.env["workflow.definition"].with_user(self.designer_user).search(
-            [("id", "in", [main_definition.id, other_definition.id])]
+        visible_for_main_designer = (
+            self.env["workflow.definition"]
+            .with_user(self.designer_user)
+            .search([("id", "in", [main_definition.id, other_definition.id])])
         )
-        self.assertIn(main_definition, visible_for_main_designer, "Main-company designer must see own company definitions")
+        self.assertIn(
+            main_definition, visible_for_main_designer, "Main-company designer must see own company definitions"
+        )
         self.assertNotIn(
             other_definition,
             visible_for_main_designer,
             "Main-company designer must not see other-company definitions",
         )
 
-        visible_for_other_designer = self.env["workflow.definition"].with_user(self.other_designer_user).search(
-            [("id", "in", [main_definition.id, other_definition.id])]
+        visible_for_other_designer = (
+            self.env["workflow.definition"]
+            .with_user(self.other_designer_user)
+            .search([("id", "in", [main_definition.id, other_definition.id])])
         )
         self.assertIn(
             other_definition,
@@ -150,11 +168,15 @@ class TestWorkflowDefinition(TransactionCase):
         )
 
     def test_security_group_permissions_designer_can_create_approver_cannot(self):
-        designer_definition = self.env["workflow.definition"].with_user(self.designer_user).create(
-            {
-                "name": "Designer Created Workflow",
-                "definition_key": "designer_created_wf",
-            }
+        designer_definition = (
+            self.env["workflow.definition"]
+            .with_user(self.designer_user)
+            .create(
+                {
+                    "name": "Designer Created Workflow",
+                    "definition_key": "designer_created_wf",
+                }
+            )
         )
         self.assertTrue(designer_definition.id, "Designer user should be able to create workflow definitions")
 

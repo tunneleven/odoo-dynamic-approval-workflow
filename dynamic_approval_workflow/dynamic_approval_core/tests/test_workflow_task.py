@@ -94,15 +94,19 @@ class TestWorkflowApproverResolution(TransactionCase):
     @classmethod
     def _create_user(cls, name_slug, group_ids):
         """Create an internal user for workflow tests."""
-        return cls.env["res.users"].with_context(no_reset_password=True).create(
-            {
-                "name": name_slug.replace("_", " ").title(),
-                "login": f"{name_slug}@example.com",
-                "email": f"{name_slug}@example.com",
-                "group_ids": [(6, 0, group_ids)],
-                "company_id": cls.company.id,
-                "company_ids": [(6, 0, [cls.company.id])],
-            }
+        return (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": name_slug.replace("_", " ").title(),
+                    "login": f"{name_slug}@example.com",
+                    "email": f"{name_slug}@example.com",
+                    "group_ids": [(6, 0, group_ids)],
+                    "company_id": cls.company.id,
+                    "company_ids": [(6, 0, [cls.company.id])],
+                }
+            )
         )
 
     def _new_rule_vals(self, **overrides):
@@ -417,9 +421,13 @@ class TestWorkflowApproverResolution(TransactionCase):
 
     def test_empty_rule_set_creates_no_approver_incident(self):
         """Missing rule rows must still produce the documented no-approver incident."""
-        approvers = self.env["workflow.approver.resolution"].browse().resolve_approvers(
-            self.instance_without_user.id,
-            context={"step_id": "UserTask_Missing"},
+        approvers = (
+            self.env["workflow.approver.resolution"]
+            .browse()
+            .resolve_approvers(
+                self.instance_without_user.id,
+                context={"step_id": "UserTask_Missing"},
+            )
         )
         incident = self.env["workflow.incident"].search(
             [

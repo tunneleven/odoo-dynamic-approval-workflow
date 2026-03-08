@@ -196,16 +196,11 @@ class WorkflowDefinitionVersion(models.Model):
             write_vals = dict(vals)
             if record.state == "published":
                 blocked = [
-                    key
-                    for key in write_vals
-                    if key in immutable_when_published and write_vals.get(key) != record[key]
+                    key for key in write_vals if key in immutable_when_published and write_vals.get(key) != record[key]
                 ]
                 if blocked:
                     raise ValidationError(
-                        _(
-                            "Published versions are immutable; cannot modify fields: %s"
-                        )
-                        % ", ".join(sorted(blocked))
+                        _("Published versions are immutable; cannot modify fields: %s") % ", ".join(sorted(blocked))
                     )
             if record.state == "draft" and any(field_name != "draft_revision" for field_name in write_vals):
                 write_vals["draft_revision"] = (record.draft_revision or 0) + 1

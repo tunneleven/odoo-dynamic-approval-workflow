@@ -36,8 +36,7 @@ class TestWorkflowExceptions(TransactionCase):
         for exception_class, parent_class in hierarchy:
             self.assertTrue(
                 issubclass(exception_class, parent_class),
-                "%s must inherit from %s."
-                % (exception_class.__name__, parent_class.__name__),
+                "%s must inherit from %s." % (exception_class.__name__, parent_class.__name__),
             )
 
     def test_exception_message_passthrough(self):

@@ -96,27 +96,21 @@ class WorkflowIncident(models.Model):
     @api.depends("category")
     def _compute_name(self):
         for record in self:
-            record.name = (
-                f"INC-{record.id or 'new'} [{record.category or ''}]"
-            )
+            record.name = f"INC-{record.id or 'new'} [{record.category or ''}]"
 
     @api.model_create_multi
     def create(self, vals_list):
         """Assign proper name with database ID after creation."""
         records = super().create(vals_list)
         for record in records:
-            record.name = (
-                f"INC-{record.id} [{record.category or ''}]"
-            )
+            record.name = f"INC-{record.id} [{record.category or ''}]"
         return records
 
     def action_triage(self):
         """Transition from open to triaged."""
         for record in self:
             if record.state != "open":
-                raise ValidationError(
-                    _("Only open incidents can be triaged.")
-                )
+                raise ValidationError(_("Only open incidents can be triaged."))
             record.write({"state": "triaged"})
         return True
 
@@ -124,13 +118,13 @@ class WorkflowIncident(models.Model):
         """Schedule retry for a triaged incident."""
         for record in self:
             if record.state != "triaged":
-                raise ValidationError(
-                    _("Only triaged incidents can be retried.")
-                )
-            record.write({
-                "state": "retry_scheduled",
-                "resolution_action": "retry",
-            })
+                raise ValidationError(_("Only triaged incidents can be retried."))
+            record.write(
+                {
+                    "state": "retry_scheduled",
+                    "resolution_action": "retry",
+                }
+            )
         return True
 
     def action_resolve(self):
@@ -140,13 +134,13 @@ class WorkflowIncident(models.Model):
         """
         for record in self:
             if record.state not in ("triaged", "retry_scheduled"):
-                raise ValidationError(
-                    _("Only triaged or retry-scheduled incidents can be resolved.")
-                )
-            record.write({
-                "state": "resolved",
-                "resolved_at_utc": fields.Datetime.now(),
-            })
+                raise ValidationError(_("Only triaged or retry-scheduled incidents can be resolved."))
+            record.write(
+                {
+                    "state": "resolved",
+                    "resolved_at_utc": fields.Datetime.now(),
+                }
+            )
         return True
 
     def action_close_with_exception(self):
@@ -156,14 +150,14 @@ class WorkflowIncident(models.Model):
         """
         for record in self:
             if record.state != "resolved":
-                raise ValidationError(
-                    _("Only resolved incidents can be closed with exception.")
-                )
-            record.write({
-                "state": "closed_with_exception",
-                "resolution_action": "close_with_exception",
-                "resolved_at_utc": fields.Datetime.now(),
-            })
+                raise ValidationError(_("Only resolved incidents can be closed with exception."))
+            record.write(
+                {
+                    "state": "closed_with_exception",
+                    "resolution_action": "close_with_exception",
+                    "resolved_at_utc": fields.Datetime.now(),
+                }
+            )
         return True
 
     def action_close(self):

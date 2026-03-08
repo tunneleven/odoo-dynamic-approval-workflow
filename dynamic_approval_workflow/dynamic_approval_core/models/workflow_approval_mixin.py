@@ -119,13 +119,17 @@ class WorkflowApprovalMixin(models.AbstractModel):
             WorkflowApprovalMixin._pending_instance_states,
         )
 
-        instances = self.env["workflow.instance"].sudo().search(
-            [
-                ("res_model", "=", self._name),
-                ("res_id", "in", self.ids),
-                ("state", "in", list(pending_states)),
-            ],
-            order="id desc",
+        instances = (
+            self.env["workflow.instance"]
+            .sudo()
+            .search(
+                [
+                    ("res_model", "=", self._name),
+                    ("res_id", "in", self.ids),
+                    ("state", "in", list(pending_states)),
+                ],
+                order="id desc",
+            )
         )
 
         instances_by_res_id = {}
@@ -160,14 +164,18 @@ class WorkflowApprovalMixin(models.AbstractModel):
             "_pending_instance_states",
             WorkflowApprovalMixin._pending_instance_states,
         )
-        return self.env["workflow.instance"].sudo().search(
-            [
-                ("res_model", "=", self._name),
-                ("res_id", "=", self.id),
-                ("state", "in", list(pending_states)),
-            ],
-            order="id desc",
-            limit=1,
+        return (
+            self.env["workflow.instance"]
+            .sudo()
+            .search(
+                [
+                    ("res_model", "=", self._name),
+                    ("res_id", "=", self.id),
+                    ("state", "in", list(pending_states)),
+                ],
+                order="id desc",
+                limit=1,
+            )
         )
 
     def _check_approval_gate(self, action_method, channel="orm"):
@@ -188,15 +196,19 @@ class WorkflowApprovalMixin(models.AbstractModel):
             "_extract_reason_code",
             WorkflowApprovalMixin._extract_reason_code,
         )
-        binding = self.env["workflow.binding"].sudo().search(
-            [
-                ("is_active", "=", True),
-                ("target_model", "=", self._name),
-                ("target_action_method", "=", action_method),
-                ("company_id", "in", [self.env.company.id, False]),
-            ],
-            order="binding_priority desc, id asc",
-            limit=1,
+        binding = (
+            self.env["workflow.binding"]
+            .sudo()
+            .search(
+                [
+                    ("is_active", "=", True),
+                    ("target_model", "=", self._name),
+                    ("target_action_method", "=", action_method),
+                    ("company_id", "in", [self.env.company.id, False]),
+                ],
+                order="binding_priority desc, id asc",
+                limit=1,
+            )
         )
         if not binding:
             return {
@@ -221,9 +233,7 @@ class WorkflowApprovalMixin(models.AbstractModel):
         except WorkflowGateBlockedError:
             raise
         except Exception as err:
-            raise WorkflowGateBlockedError(
-                _("Workflow gate evaluation failed. Action is blocked.")
-            ) from err
+            raise WorkflowGateBlockedError(_("Workflow gate evaluation failed. Action is blocked.")) from err
 
         state = normalize_gate_state(gate_result)
         policy_message = extract_policy_message(gate_result)
@@ -234,13 +244,9 @@ class WorkflowApprovalMixin(models.AbstractModel):
             "binding_id": binding.id,
         }
         if state == "blocked":
-            raise WorkflowGateBlockedError(
-                policy_message or _("Action is blocked by workflow policy.")
-            )
+            raise WorkflowGateBlockedError(policy_message or _("Action is blocked by workflow policy."))
         if state not in {"allowed", "allowed_with_warning"}:
-            raise WorkflowGateBlockedError(
-                _("Workflow gate returned invalid state. Action is blocked.")
-            )
+            raise WorkflowGateBlockedError(_("Workflow gate returned invalid state. Action is blocked."))
         return result
 
     def _workflow_check_gate(self, action_method, channel="orm"):
@@ -267,8 +273,4 @@ class WorkflowApprovalMixin(models.AbstractModel):
     def _extract_policy_message(gate_result):
         if not isinstance(gate_result, dict):
             return _("Workflow gate response is invalid.")
-        return (
-            gate_result.get("policy_message")
-            or gate_result.get("warning_message")
-            or ""
-        )
+        return gate_result.get("policy_message") or gate_result.get("warning_message") or ""

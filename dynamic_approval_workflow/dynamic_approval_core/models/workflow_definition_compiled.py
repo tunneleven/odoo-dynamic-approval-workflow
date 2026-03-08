@@ -58,13 +58,9 @@ class WorkflowDefinitionCompiled(models.Model):
 
     def write(self, vals):
         """Block all modifications — compiled artifacts are immutable after creation."""
-        raise WorkflowError(
-            _("Compiled workflow artifacts are immutable and cannot be modified.")
-        )
+        raise WorkflowError(_("Compiled workflow artifacts are immutable and cannot be modified."))
 
     @api.ondelete(at_uninstall=False)
     def _unlink_except_immutable(self):
         """Block deletion — compiled artifacts are immutable after creation."""
-        raise WorkflowError(
-            _("Compiled workflow artifacts are immutable and cannot be deleted.")
-        )
+        raise WorkflowError(_("Compiled workflow artifacts are immutable and cannot be deleted."))

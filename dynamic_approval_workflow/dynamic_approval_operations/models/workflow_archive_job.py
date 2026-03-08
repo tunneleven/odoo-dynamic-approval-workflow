@@ -55,6 +55,4 @@ class WorkflowArchiveJob(models.Model):
 
     def _compute_name(self):
         for record in self:
-            record.name = (
-                f"{record.job_type or 'job'}-{record.id or 'new'}"
-            )
+            record.name = f"{record.job_type or 'job'}-{record.id or 'new'}"

@@ -63,10 +63,7 @@ class WorkflowDefinition(models.Model):
         for record in self:
             if not self._definition_key_regex.fullmatch(record.definition_key or ""):
                 raise ValidationError(
-                    _(
-                        "Definition key must match ^[a-z][a-z0-9_]{2,63}$ "
-                        "(lowercase letters, digits, underscores)."
-                    )
+                    _("Definition key must match ^[a-z][a-z0-9_]{2,63}$ " "(lowercase letters, digits, underscores).")
                 )
 
     @api.constrains("tag_ids", "company_id")
@@ -85,9 +82,7 @@ class WorkflowDefinition(models.Model):
 
     def write(self, vals):
         if "definition_key" in vals:
-            changed_definitions = self.filtered(
-                lambda definition: definition.definition_key != vals["definition_key"]
-            )
+            changed_definitions = self.filtered(lambda definition: definition.definition_key != vals["definition_key"])
             if changed_definitions:
                 published_count = self.env["workflow.definition.version"].search_count(
                     [
@@ -96,9 +91,7 @@ class WorkflowDefinition(models.Model):
                     ]
                 )
                 if published_count:
-                    raise ValidationError(
-                        _("Definition key is immutable after first publish.")
-                    )
+                    raise ValidationError(_("Definition key is immutable after first publish."))
         return super().write(vals)
 
 
