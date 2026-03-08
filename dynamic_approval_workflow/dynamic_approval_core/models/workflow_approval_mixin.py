@@ -94,11 +94,9 @@ class WorkflowApprovalMixin(models.AbstractModel):
                 order="id desc",
             )
             for instance in instances:
-                target_record = instance.res_id
-                target_record_id = target_record.id if target_record else False
+                target_record_id = instance.res_id
                 if target_record_id in self.ids:
                     instances_by_record_id[target_record_id] |= instance
-
         for record in self:
             record.workflow_instance_ids = instances_by_record_id[record.id]
 
