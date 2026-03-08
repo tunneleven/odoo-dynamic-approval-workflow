@@ -17,7 +17,7 @@
     <menuitem id="menu_workflow_bindings"
               name="Bindings"
               parent="menu_workflow_root"
-              action="workflow_binding_action"
+              action="action_workflow_binding"
               groups="dynamic_approval_core.group_workflow_designer"
               sequence="20"/>
 
