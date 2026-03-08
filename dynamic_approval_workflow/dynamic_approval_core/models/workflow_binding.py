@@ -301,8 +301,6 @@ class WorkflowBinding(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         records = super().create(vals_list)
-        if not self.env.context.get("skip_binding_revision_increment"):
-            records._increment_config_revision()
         records._refresh_interceptor_patches()
         return records
 
