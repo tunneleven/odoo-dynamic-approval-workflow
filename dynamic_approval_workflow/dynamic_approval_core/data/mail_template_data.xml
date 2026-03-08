@@ -36,7 +36,7 @@
                 <p>This is a reminder for a pending approval task.</p>
                 <ul>
                     <li><strong>Task:</strong> ${object.name}</li>
-                    <li><strong>Status:</strong> ${object.status}</li>
+                    <li><strong>Status:</strong> ${object._fields['status'].convert_to_export(object.status, object) or ''}</li>
                     <li><strong>SLA Due:</strong> ${object.sla_due_at_utc or 'No deadline set'}</li>
                 </ul>
                 <p>Please complete the task before the deadline.</p>
