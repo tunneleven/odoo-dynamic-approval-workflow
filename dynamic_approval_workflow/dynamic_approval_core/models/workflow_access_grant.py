@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import _, api, fields, models
 
 
 class WorkflowAccessGrant(models.Model):
@@ -71,3 +71,75 @@ class WorkflowAccessGrant(models.Model):
         store=True,
         index=True,
     )
+
+    def _create_lifecycle_logs(self, event_type, reason):
+        """Persist immutable lifecycle log entries for the grant recordset."""
+        log_model = self.env["workflow.access.grant.log"]
+        for record in self:
+            log_model.create(
+                {
+                    "grant_id": record.id,
+                    "event_type": event_type,
+                    "reason": reason,
+                }
+            )
+
+    @api.model
+    def _cron_expire_grants(self):
+        """Expire active grants that have reached their configured TTL."""
+        now = fields.Datetime.now()
+        expired_grants = self.search(
+            [
+                ("state", "=", "active"),
+                ("expires_at_utc", "<=", now),
+            ]
+        )
+        if not expired_grants:
+            return 0
+
+        expired_grants.write(
+            {
+                "state": "expired",
+                "revoked_at_utc": now,
+                "revoke_reason": "ttl_expired",
+            }
+        )
+        expired_grants._create_lifecycle_logs(
+            "expired",
+            _("Grant expired after TTL elapsed."),
+        )
+        return len(expired_grants)
+
+    @api.model
+    def _cron_reconcile_orphan_grants(self):
+        """Revoke grants whose driving task or instance is no longer actionable."""
+        orphan_grants = self.search(
+            [
+                ("state", "=", "active"),
+                "|",
+                ("task_id.status", "=", "completed"),
+                (
+                    "instance_id.state",
+                    "in",
+                    ("completed_approved", "completed_rejected", "cancelled"),
+                ),
+            ]
+        )
+        if not orphan_grants:
+            return 0
+
+        now = fields.Datetime.now()
+        for grant in orphan_grants:
+            revoke_reason = "instance_cancelled" if grant.instance_id.state == "cancelled" else "task_completed"
+            grant.write(
+                {
+                    "state": "revoked",
+                    "revoked_at_utc": now,
+                    "revoke_reason": revoke_reason,
+                }
+            )
+            grant._create_lifecycle_logs(
+                "reconciled",
+                _("Grant revoked by orphan-grant reconciliation."),
+            )
+        return len(orphan_grants)

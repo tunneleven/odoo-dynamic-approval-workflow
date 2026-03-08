@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class WorkflowNodeRuntime(models.Model):
@@ -53,3 +53,14 @@ class WorkflowNodeRuntime(models.Model):
         store=True,
         index=True,
     )
+
+    @api.model
+    def _cron_discover_expired_timers(self):
+        """Discover timer nodes ready for asynchronous execution.
+
+        The current runtime schema does not yet persist timer deadlines on
+        node runtimes, so this scheduler entrypoint remains a safe no-op
+        until later runtime tasks add deadline metadata.
+        """
+
+        return 0

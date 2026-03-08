@@ -1,46 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo noupdate="1">
 
-    <!-- SDS §6.3 Hybrid Scheduler Cron Jobs -->
-
-    <!-- Timer discovery — scan for expired timers/SLAs (1 min) -->
-    <record id="ir_cron_workflow_timer_discovery" model="ir.cron">
-        <field name="name">Workflow: Timer Discovery</field>
-        <field name="model_id" ref="model_workflow_instance"/>
+    <record id="ir_cron_timer_discovery" model="ir.cron">
+        <field name="name">Workflow: Discover Expired Timers</field>
+        <field name="model_id" ref="model_workflow_node_runtime"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_discover_expired_timers()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">minutes</field>
-        <field name="active" eval="False"/>
-        <field name="code">model._cron_discover_expired_timers()</field>
+        <field name="active" eval="True"/>
     </record>
 
-    <!-- SLA checker — approaching/breached deadlines (5 min) -->
-    <record id="ir_cron_workflow_sla_checker" model="ir.cron">
-        <field name="name">Workflow: SLA Checker</field>
+    <record id="ir_cron_sla_checker" model="ir.cron">
+        <field name="name">Workflow: Check SLA Deadlines</field>
         <field name="model_id" ref="model_workflow_task"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_check_sla()</field>
         <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
-        <field name="active" eval="False"/>
-        <field name="code">model._cron_check_sla_deadlines()</field>
+        <field name="active" eval="True"/>
     </record>
 
-    <!-- Grant reconciliation — orphan detection (1 hour) -->
-    <record id="ir_cron_workflow_grant_reconciliation" model="ir.cron">
-        <field name="name">Workflow: Grant Reconciliation</field>
+    <record id="ir_cron_deadline_checker" model="ir.cron">
+        <field name="name">Workflow: Check Task Deadlines</field>
+        <field name="model_id" ref="model_workflow_task"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_check_deadlines()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_grant_expiry" model="ir.cron">
+        <field name="name">Workflow: Expire Access Grants</field>
         <field name="model_id" ref="model_workflow_access_grant"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_expire_grants()</field>
+        <field name="interval_number">5</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="ir_cron_grant_reconciliation" model="ir.cron">
+        <field name="name">Workflow: Reconcile Orphan Grants</field>
+        <field name="model_id" ref="model_workflow_access_grant"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_reconcile_orphan_grants()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">hours</field>
-        <field name="active" eval="False"/>
-        <field name="code">model._cron_reconcile_grants()</field>
+        <field name="active" eval="True"/>
     </record>
 
-    <!-- Deadline checker — approaching task deadlines (5 min) -->
-    <record id="ir_cron_workflow_deadline_checker" model="ir.cron">
-        <field name="name">Workflow: Deadline Checker</field>
-        <field name="model_id" ref="model_workflow_task"/>
-        <field name="interval_number">5</field>
-        <field name="interval_type">minutes</field>
-        <field name="active" eval="False"/>
-        <field name="code">model._cron_check_deadlines()</field>
+    <record id="ir_cron_idempotency_purge" model="ir.cron">
+        <field name="name">Workflow: Purge Expired Idempotency Keys</field>
+        <field name="model_id" ref="model_workflow_idempotency_registry"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_purge_expired()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="active" eval="True"/>
     </record>
 
 </odoo>

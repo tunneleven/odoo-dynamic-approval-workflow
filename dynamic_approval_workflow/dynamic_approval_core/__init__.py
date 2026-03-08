@@ -1,3 +1,3 @@
-from . import controllers
-from . import models
-from . import wizards
+from . import controllers as controllers
+from . import models as models
+from . import wizards as wizards

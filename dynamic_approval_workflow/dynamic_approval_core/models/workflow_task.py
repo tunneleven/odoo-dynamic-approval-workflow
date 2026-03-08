@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class WorkflowTask(models.Model):
@@ -73,11 +73,28 @@ class WorkflowTask(models.Model):
         index=True,
     )
 
+    @api.depends("sla_due_at_utc", "status")
     def _compute_is_overdue(self):
+        """Mark non-terminal tasks that have crossed their SLA deadline."""
         now = fields.Datetime.now()
         for task in self:
             task.is_overdue = bool(
-                task.sla_due_at_utc
-                and task.status in ("pending", "assigned")
-                and task.sla_due_at_utc < now
+                task.sla_due_at_utc and task.status not in ("completed", "cancelled") and task.sla_due_at_utc < now
             )
+
+    @api.model
+    def _cron_check_sla(self):
+        """Refresh overdue markers for tasks with SLA deadlines."""
+        tracked_tasks = self.search(
+            [
+                ("sla_due_at_utc", "!=", False),
+                ("status", "not in", ("completed", "cancelled")),
+            ]
+        )
+        tracked_tasks._compute_is_overdue()
+        return len(tracked_tasks.filtered("is_overdue"))
+
+    @api.model
+    def _cron_check_deadlines(self):
+        """Scan overdue tasks for deadline-driven follow-up actions."""
+        return self._cron_check_sla()

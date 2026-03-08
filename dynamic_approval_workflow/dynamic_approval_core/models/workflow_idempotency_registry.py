@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class WorkflowIdempotencyRegistry(models.Model):
@@ -75,3 +75,16 @@ class WorkflowIdempotencyRegistry(models.Model):
         "UNIQUE(operation_scope_hash)",
         "Duplicate idempotency scope detected.",
     )
+
+    @api.model
+    def _cron_purge_expired(self):
+        """Delete idempotency entries whose retention window has elapsed."""
+        expired_entries = self.search(
+            [
+                ("expires_at_utc", "!=", False),
+                ("expires_at_utc", "<=", fields.Datetime.now()),
+            ]
+        )
+        expired_count = len(expired_entries)
+        expired_entries.unlink()
+        return expired_count
