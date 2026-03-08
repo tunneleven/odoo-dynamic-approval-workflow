@@ -1,8 +1,12 @@
+from datetime import timedelta
+from unittest.mock import patch
+
+from odoo import fields
 from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
-from ..exceptions import WorkflowConfigurationError
+from ..exceptions import WorkflowConfigurationError, WorkflowSecurityPolicyError
 
 
 @tagged("post_install", "-at_install")
@@ -21,11 +25,32 @@ class TestWorkflowApproverResolution(TransactionCase):
                 "privilege_id": cls.workflow_privilege.id,
             }
         )
+        cls.approver_implied_group = cls.env["res.groups"].create(
+            {
+                "name": "Workflow Resolution Implied Group",
+                "privilege_id": cls.workflow_privilege.id,
+            }
+        )
+        cls.approver_parent_group = cls.env["res.groups"].create(
+            {
+                "name": "Workflow Resolution Parent Group",
+                "privilege_id": cls.workflow_privilege.id,
+                "implied_ids": [(4, cls.approver_implied_group.id)],
+            }
+        )
         cls.requester_user = cls._create_user("requester_user", [cls.base_group_user.id])
         cls.fixed_user = cls._create_user("fixed_user", [cls.base_group_user.id])
         cls.group_user = cls._create_user(
             "group_user",
             [cls.base_group_user.id, cls.approver_group.id],
+        )
+        cls.inherited_group_user = cls._create_user(
+            "inherited_group_user",
+            [cls.base_group_user.id, cls.approver_implied_group.id],
+        )
+        cls.direct_group_user = cls._create_user(
+            "direct_group_user",
+            [cls.base_group_user.id, cls.approver_parent_group.id],
         )
         cls.field_user = cls._create_user("field_user", [cls.base_group_user.id])
         cls.fallback_user = cls._create_user("fallback_user", [cls.base_group_user.id])
@@ -162,6 +187,24 @@ class TestWorkflowApproverResolution(TransactionCase):
             "Group resolution must expand to the configured group's users.",
         )
 
+    def test_resolve_approvers_keeps_direct_group_members_before_inherited(self):
+        """Group expansion must keep direct members ahead of implied-group members."""
+        rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                resolution_type="group",
+                user_ids=[(5, 0, 0)],
+                group_id=self.approver_parent_group.id,
+            )
+        )
+
+        approvers = rule.resolve_approvers(self.instance_with_user.id)
+
+        self.assertEqual(
+            approvers.ids,
+            [self.direct_group_user.id, self.inherited_group_user.id],
+            "Group expansion must keep direct members before inherited members.",
+        )
+
     def test_resolve_approvers_returns_field_path_user(self):
         """Record-field rules resolve users from the workflow target record."""
         rule = self.env["workflow.approver.resolution"].create(
@@ -257,6 +300,66 @@ class TestWorkflowApproverResolution(TransactionCase):
             incident_model.search_count([]),
             incident_count,
             "Successful fallback must not create an incident.",
+        )
+
+    def test_policy_filtered_primary_source_blocks_instead_of_using_fallback(self):
+        """Anti-self and SoD policy removal must block instead of falling back."""
+        self_request_instance = self.env["workflow.instance"].create(
+            {
+                "definition_id": self.definition.id,
+                "definition_version_id": self.definition_version.id,
+                "res_model": "res.partner",
+                "res_id": self.partner_with_user.id,
+                "requester_id": self.fixed_user.id,
+            }
+        )
+        rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                user_ids=[(6, 0, [self.fixed_user.id])],
+                fallback_type="fallback_named_users",
+                fallback_user_ids=[(6, 0, [self.fallback_user.id])],
+            )
+        )
+
+        with self.assertRaises(WorkflowSecurityPolicyError):
+            rule.resolve_approvers(self_request_instance.id)
+
+    def test_delegate_rule_resolves_active_delegate_at_valid_to_boundary(self):
+        """Delegate rules must resolve active delegates through the public API."""
+        boundary_now = fields.Datetime.now()
+        self.env["workflow.delegation.record"].create(
+            {
+                "delegator_id": self.fixed_user.id,
+                "delegate_id": self.fallback_user.id,
+                "valid_from": boundary_now - timedelta(minutes=5),
+                "valid_to": boundary_now,
+                "definition_id": self.definition.id,
+                "company_id": self.company.id,
+            }
+        )
+        source_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="Delegate Source Rule",
+                sequence=10,
+                user_ids=[(6, 0, [self.fixed_user.id])],
+            )
+        )
+        delegate_rule = self.env["workflow.approver.resolution"].create(
+            self._new_rule_vals(
+                name="Delegate Resolution Rule",
+                sequence=20,
+                resolution_type="delegate",
+                user_ids=[(5, 0, 0)],
+            )
+        )
+
+        with patch("odoo.fields.Datetime.now", return_value=boundary_now):
+            approvers = (source_rule | delegate_rule).resolve_approvers(self.instance_with_user.id)
+
+        self.assertIn(
+            self.fallback_user.id,
+            approvers.ids,
+            "Delegate rules must resolve active delegations without hidden caller context.",
         )
 
     def test_empty_rule_set_creates_no_approver_incident(self):

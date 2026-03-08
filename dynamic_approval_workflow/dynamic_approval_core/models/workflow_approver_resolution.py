@@ -4,7 +4,7 @@ from json import JSONDecodeError
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
-from ..exceptions import WorkflowConfigurationError, WorkflowRuntimeError
+from ..exceptions import WorkflowConfigurationError, WorkflowRuntimeError, WorkflowSecurityPolicyError
 
 
 class WorkflowApproverResolution(models.Model):
@@ -158,8 +158,9 @@ class WorkflowApproverResolution(models.Model):
         seen_ids = set()
 
         for rule in ordered_rules:
-            users = rule._resolve_rule_approvers(instance, context=context, create_incident=False)
-            for user in users.sorted("id"):
+            rule_context = dict(context, resolved_approver_ids=list(resolved_ids))
+            users = rule._resolve_rule_approvers(instance, context=rule_context, create_incident=False)
+            for user in users:
                 if user.id in seen_ids:
                     continue
                 seen_ids.add(user.id)
@@ -230,14 +231,26 @@ class WorkflowApproverResolution(models.Model):
         """Resolve approvers for a single rule."""
         self.ensure_one()
         resolved_users = self._resolve_source_users(instance, context=context)
-        resolved_users = self._filter_resolved_users(instance, resolved_users, context=context)
+        resolved_users = self._filter_resolved_users(
+            resolved_users,
+            preserve_order=self.resolution_type in {"group", "role", "delegate"},
+        )
+        policy_filtered_users = self._apply_policy_filters(instance, resolved_users, context=context)
+        if policy_filtered_users:
+            return policy_filtered_users
         if resolved_users:
-            return resolved_users
+            self._raise_policy_block(instance)
 
         fallback_users = self._evaluate_fallback(instance, context=context)
-        fallback_users = self._filter_resolved_users(instance, fallback_users, context=context)
+        fallback_users = self._filter_resolved_users(
+            fallback_users,
+            preserve_order=self.fallback_type == "fallback_group",
+        )
+        policy_filtered_fallback = self._apply_policy_filters(instance, fallback_users, context=context)
+        if policy_filtered_fallback:
+            return policy_filtered_fallback
         if fallback_users:
-            return fallback_users
+            self._raise_policy_block(instance)
 
         if create_incident:
             self._create_no_approver_incident(instance, context=context)
@@ -250,10 +263,13 @@ class WorkflowApproverResolution(models.Model):
         context = dict(context or {})
 
         if resolution_type == "user":
-            return self._normalize_user_recordset(self.user_ids)
+            return self._normalize_user_recordset(self.user_ids.sorted("id"), preserve_order=True)
 
         if resolution_type in {"group", "role"}:
-            return self._normalize_user_recordset(self._users_from_single_group(self.group_id))
+            return self._normalize_user_recordset(
+                self._users_from_single_group(self.group_id),
+                preserve_order=True,
+            )
 
         if resolution_type == "hierarchy":
             return self._normalize_user_recordset(
@@ -264,17 +280,24 @@ class WorkflowApproverResolution(models.Model):
             return self._normalize_user_recordset(self._resolve_users_from_field_path(instance))
 
         if resolution_type == "delegate":
-            return self._normalize_user_recordset(self._resolve_users_from_delegate_rules(instance, context))
+            return self._normalize_user_recordset(
+                self._resolve_users_from_delegate_rules(instance, context),
+                preserve_order=True,
+            )
 
         return self.env["res.users"]
 
-    def _filter_resolved_users(self, instance, users, context=None):
-        """Apply active-user, anti-self, and SoD filters to a user set."""
+    def _filter_resolved_users(self, users, preserve_order=False):
+        """Apply active-user filtering to a user set."""
         self.ensure_one()
-        filtered_users = self._normalize_user_recordset(users)
-        filtered_users = self._apply_anti_self(filtered_users, instance.requester_id.id)
+        return self._normalize_user_recordset(users, preserve_order=preserve_order)
+
+    def _apply_policy_filters(self, instance, users, context=None):
+        """Apply anti-self and SoD filters to an already-active user set."""
+        self.ensure_one()
+        filtered_users = self._apply_anti_self(users, instance.requester_id.id)
         filtered_users = self._apply_sod(filtered_users, (context or {}).get("prior_decisions"))
-        return self._normalize_user_recordset(filtered_users)
+        return self._normalize_user_recordset(filtered_users, preserve_order=True)
 
     def _resolve_users_from_field_path(self, instance):
         """Resolve approvers from the instance target record field path."""
@@ -341,6 +364,10 @@ class WorkflowApproverResolution(models.Model):
         if not delegator_users:
             delegator_users = self._users_from_context(context, "delegate_for")
         if not delegator_users:
+            delegator_users = self._users_from_context(context, "resolved_approver")
+        if not delegator_users and instance.requester_id:
+            delegator_users = instance.requester_id
+        if not delegator_users:
             return self.env["res.users"]
 
         now = fields.Datetime.now()
@@ -348,7 +375,7 @@ class WorkflowApproverResolution(models.Model):
             ("delegator_id", "in", delegator_users.ids),
             ("company_id", "=", instance.company_id.id),
             ("valid_from", "<=", now),
-            ("valid_to", ">", now),
+            ("valid_to", ">=", now),
             "|",
             ("definition_id", "=", False),
             ("definition_id", "=", instance.definition_id.id),
@@ -402,6 +429,16 @@ class WorkflowApproverResolution(models.Model):
         if instance.state != "error_incident":
             instance.write({"state": "error_incident"})
         return incident
+
+    def _raise_policy_block(self, instance):
+        """Block activation when policy rules exclude every active approver."""
+        self.ensure_one()
+        raise WorkflowSecurityPolicyError(
+            _(
+                "Approver resolution for node '%(node)s' is blocked by anti-self approval or separation-of-duty policy."
+            )
+            % {"node": self.node_id or instance.id}
+        )
 
     def _resolve_instance(self, instance_id):
         """Return a workflow.instance record from an ID or record."""
@@ -472,10 +509,22 @@ class WorkflowApproverResolution(models.Model):
                 actor_ids.add(item["actor_id"])
         return actor_ids
 
-    def _normalize_user_recordset(self, users):
+    def _normalize_user_recordset(self, users, preserve_order=False):
         """Return a deterministic, active-only user recordset."""
         user_recordset = self._coerce_records_to_users(users)
-        ordered_ids = sorted(user_recordset.filtered("active").ids)
+        active_users = user_recordset.filtered("active")
+        if not preserve_order:
+            ordered_ids = sorted(active_users.ids)
+            return self.env["res.users"].browse(ordered_ids)
+
+        ordered_ids = []
+        seen_ids = set()
+        active_ids = set(active_users.ids)
+        for user_id in user_recordset.ids:
+            if user_id not in active_ids or user_id in seen_ids:
+                continue
+            seen_ids.add(user_id)
+            ordered_ids.append(user_id)
         return self.env["res.users"].browse(ordered_ids)
 
     def _coerce_records_to_users(self, records):
@@ -506,10 +555,18 @@ class WorkflowApproverResolution(models.Model):
         group = group.exists()
         if not group:
             return self.env["res.users"]
-        users = group.user_ids
-        if "all_user_ids" in group._fields:
-            users |= group.all_user_ids
-        return users
+        ordered_ids = []
+        seen_ids = set()
+        for user in group.user_ids.sorted("id"):
+            seen_ids.add(user.id)
+            ordered_ids.append(user.id)
+        for implied_group in self._iter_implied_groups(group):
+            for user in implied_group.user_ids.sorted("id"):
+                if user.id in seen_ids:
+                    continue
+                seen_ids.add(user.id)
+                ordered_ids.append(user.id)
+        return self.env["res.users"].browse(ordered_ids)
 
     def _users_from_group_recordset(self, groups):
         """Resolve direct and inherited members from multiple groups."""
@@ -518,6 +575,17 @@ class WorkflowApproverResolution(models.Model):
         for group in groups.exists():
             users |= self._users_from_single_group(group)
         return users
+
+    def _iter_implied_groups(self, group, seen_group_ids=None):
+        """Yield implied groups depth-first in deterministic order."""
+        self.ensure_one()
+        seen_group_ids = set(seen_group_ids or set())
+        for implied_group in group.implied_ids.sorted("id"):
+            if implied_group.id in seen_group_ids:
+                continue
+            seen_group_ids.add(implied_group.id)
+            yield implied_group
+            yield from self._iter_implied_groups(implied_group, seen_group_ids=seen_group_ids)
 
     def _users_from_context(self, context, prefix):
         """Resolve users from common context key variants."""
