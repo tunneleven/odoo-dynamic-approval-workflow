@@ -109,9 +109,34 @@ class WorkflowApprovalMixin(models.AbstractModel):
 
     @api.depends()
     def _compute_active_instance(self):
+        if not self:
+            return
+
+        mixin_class = type(self)
+        pending_states = getattr(
+            mixin_class,
+            "_pending_instance_states",
+            WorkflowApprovalMixin._pending_instance_states,
+        )
+
+        instances = self.env["workflow.instance"].sudo().search(
+            [
+                ("res_model", "=", self._name),
+                ("res_id", "in", self.ids),
+                ("state", "in", list(pending_states)),
+            ],
+            order="id desc",
+        )
+
+        instances_by_res_id = {}
+        for instance in instances:
+            # Keep only the latest instance per record (thanks to order="id desc").
+            if instance.res_id not in instances_by_res_id:
+                instances_by_res_id[instance.res_id] = instance
+
         for record in self:
-            active_instance = record._get_active_workflow_instance()
-            record.active_instance_id = active_instance
+            active_instance = instances_by_res_id.get(record.id)
+            record.active_instance_id = active_instance or False
             record.active_instance_state = active_instance.state if active_instance else False
 
     @classmethod
