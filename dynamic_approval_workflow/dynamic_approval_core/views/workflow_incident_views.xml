@@ -49,6 +49,7 @@
                             invisible="state != 'resolved'"
                             groups="dynamic_approval_core.group_workflow_admin"/>
                     <field name="state" widget="statusbar"
+                           readonly="1"
                            statusbar_visible="open,triaged,retry_scheduled,resolved,closed_with_exception"/>
                 </header>
                 <sheet>

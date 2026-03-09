@@ -8,11 +8,24 @@ Purpose: provide one clear, repeatable workflow for agents to pick a task, imple
 - Treat this file as the default operational checklist for task execution.
 - Any automation or shell command that starts a task must explicitly instruct the agent to read this file first.
 
+## 0.1) Shell Bootstrap (Mandatory)
+
+- Every task command in this workflow must run inside the workspace virtualenv at `/home/tunn/Documents/Odoo 19/venv`.
+- Do not use system Python or a different virtualenv for task execution, verification, or helper scripts.
+- Activate the workspace virtualenv once at the start of the shell session; all Python commands below assume it stays active.
+
+```bash
+source "/home/tunn/Documents/Odoo 19/venv/bin/activate"
+which python
+python --version
+```
+
 ## 1) Preconditions
 
 - `gh` CLI authenticated (`gh auth status`).
 - Remote branch access to `tunneleven/odoo-dynamic-approval-workflow`.
 - Odoo launcher available at repository parent (`./odoo.sh`).
+- Workspace virtualenv available at `/home/tunn/Documents/Odoo 19/venv` and activated in the current shell.
 - Work from a clean branch dedicated to one task.
 
 ## 2) Pick One Task
@@ -91,7 +104,7 @@ Run these checks before commit:
 
 ```bash
 # Odoo 19 XML/API compatibility
-python3 scripts/check_odoo19_compat.py
+python scripts/check_odoo19_compat.py
 
 # Module install sanity
 cd .. && ./odoo.sh -d test_<task_id_slug> -i dynamic_approval_core --stop-after-init --without-demo
@@ -100,7 +113,7 @@ cd .. && ./odoo.sh -d test_<task_id_slug> -i dynamic_approval_core --stop-after-
 If Python changed, also run:
 
 ```bash
-python3 -m py_compile <changed_python_files>
+python -m py_compile <changed_python_files>
 ```
 
 If task includes tests, run targeted test tags/file.
@@ -160,7 +173,7 @@ Task ID: `TASK-Px-yyy`
 - `path/file2`
 
 ## Verification
-- `python3 scripts/check_odoo19_compat.py`
+- `python scripts/check_odoo19_compat.py`
 - `./odoo.sh -d test_<task> -i dynamic_approval_core --stop-after-init --without-demo`
 
 Closes #<issue_number>
@@ -246,3 +259,4 @@ Before merge, confirm:
 - Do not assume the task ID alone will close the issue.
 - Do not blindly accept/reject Copilot comments; always justify with repo context.
 - Do not skip local verification before pushing.
+- Do not run task commands outside `/home/tunn/Documents/Odoo 19/venv`.
