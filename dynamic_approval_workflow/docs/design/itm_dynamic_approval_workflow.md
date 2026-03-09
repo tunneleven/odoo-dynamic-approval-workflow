@@ -665,7 +665,7 @@ blocker_tags: []
 
 ```yaml
 task_id: TASK-P3-001
-title: "Implement workflow.instance with 15-state transition machine, _tick engine loop, advisory locking, and cancel/recover actions"
+title: "Implement workflow.instance runtime shell with OMB state machine, advisory locking, and start/cancel/recover actions"
 phase: 3
 depends_on: [TASK-P1-003, TASK-P2-001]
 agent: either
@@ -678,12 +678,12 @@ sds_sections: ["SDS §6"]
 srs_requirements: [FR-021, FR-022, FR-026, FR-027, FR-028]
 acceptance_criteria:
   - All fields from OMB-01 §8 including One2many inverse fields
-  - State machine with 15 transitions per transition table
-  - Advisory lock (pg_advisory_xact_lock) on _tick method
-  - _tick method implementing token-based engine loop (evaluate conditions, fire transitions, advance tokens)
-  - action_cancel, action_recover, action_suspend, action_resume methods
+  - State machine aligned to the OMB-01 §8 transition table
+  - Advisory transaction lock for per-instance runtime serialization during _tick
+  - _tick method implementing deterministic token-based engine progression for sequential and exclusive routing; unsupported parallel paths fail closed pending later Phase 3 tasks
+  - action_start, action_cancel, and action_recover methods
   - _evaluate_gate_condition dispatching to condition.rule evaluator
-  - Recompute state from child node_runtime states
+  - Recompute state from child node_runtime, task, and incident states
 verification_command: |
   odoo-bin -d test_db -i dynamic_approval_core --stop-after-init
 complexity: L
