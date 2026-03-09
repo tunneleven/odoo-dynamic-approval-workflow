@@ -19,6 +19,7 @@ class TestWorkflowEnforcement(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.group_workflow_admin = cls.env.ref("dynamic_approval_core.group_workflow_admin")
+        cls.other_company = cls.env["res.company"].create({"name": "Interceptor Other Company"})
         cls.workflow_admin_user = (
             cls.env["res.users"]
             .with_context(no_reset_password=True)
@@ -211,6 +212,85 @@ class TestWorkflowEnforcement(TransactionCase):
 
         self.assertEqual(incident.state, "open")
 
+    def test_allowed_with_warning_gate_executes_original_method(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        observed_events = []
+
+        def _capture_log_event(*args, **kwargs):
+            observed_events.append(
+                {
+                    "state": args[3],
+                    "reason_code": kwargs.get("reason_code"),
+                    "policy_message": kwargs.get("policy_message"),
+                }
+            )
+
+        incident = self._create_incident()
+        with patch.object(
+            WorkflowEnforcementInterceptor,
+            "_log_gate_event",
+            side_effect=_capture_log_event,
+        ):
+            with patch.object(
+                type(binding),
+                "evaluate_gate",
+                return_value={
+                    "decision": "allow_with_warning",
+                    "reason_code": "policy_warning",
+                    "warning_message": "Approval warning.",
+                },
+            ) as evaluate_gate:
+                incident.action_triage()
+
+        self.assertEqual(evaluate_gate.call_count, 1)
+        self.assertEqual(incident.state, "triaged")
+        self.assertEqual(
+            observed_events,
+            [
+                {
+                    "state": "allowed_with_warning",
+                    "reason_code": "policy_warning",
+                    "policy_message": "Approval warning.",
+                }
+            ],
+        )
+
+    def test_binding_disable_removes_interceptor_patch(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+
+        incident = self._create_incident()
+        with patch.object(
+            type(binding),
+            "evaluate_gate",
+            return_value={"state": "allowed", "reason_code": "allowed"},
+        ) as evaluate_gate:
+            incident.action_triage()
+
+        self.assertEqual(evaluate_gate.call_count, 1)
+        self.assertEqual(incident.state, "triaged")
+
+        binding.action_disable()
+
+        disabled_incident = self._create_incident()
+        with patch.object(
+            type(binding),
+            "evaluate_gate",
+            side_effect=AssertionError("Disabled bindings must not be evaluated."),
+        ):
+            disabled_incident.action_triage()
+
+        self.assertEqual(disabled_incident.state, "triaged")
+
     def test_gate_evaluation_exception_fails_closed(self):
         binding = self._create_binding(
             target_action_method="action_triage",
@@ -225,6 +305,96 @@ class TestWorkflowEnforcement(TransactionCase):
                 incident.action_triage()
 
         self.assertEqual(incident.state, "open")
+
+    def test_invalid_gate_state_fails_closed(self):
+        binding = self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        incident_reasons = []
+
+        def _capture_incident(_env, reason_code, model_name, method_name, details):
+            incident_reasons.append(
+                {
+                    "reason_code": reason_code,
+                    "model_name": model_name,
+                    "method_name": method_name,
+                    "details": details,
+                }
+            )
+
+        incident = self._create_incident()
+        with patch.object(
+            WorkflowEnforcementInterceptor,
+            "_record_incident",
+            side_effect=_capture_incident,
+        ):
+            with patch.object(
+                type(binding),
+                "evaluate_gate",
+                return_value={"state": "mystery_state", "reason_code": "mystery_state"},
+            ):
+                with self.assertRaisesRegex(WorkflowGateBlockedError, "invalid state"):
+                    incident.action_triage()
+
+        self.assertEqual(incident.state, "open")
+        self.assertEqual(
+            incident_reasons,
+            [
+                {
+                    "reason_code": "invalid_gate_state",
+                    "model_name": "workflow.incident",
+                    "method_name": "action_triage",
+                    "details": "Gate state 'mystery_state' is unsupported.",
+                }
+            ],
+        )
+
+    def test_company_mismatch_path_fails_closed_as_uncovered(self):
+        self._create_binding(
+            target_action_method="action_triage",
+            enforcement_mode="orm_enforced",
+            is_active=True,
+            company_id=self.other_company.id,
+        )
+        WorkflowEnforcementInterceptor._apply_patches(self.env)
+
+        incident_reasons = []
+
+        def _capture_incident(_env, reason_code, model_name, method_name, details):
+            incident_reasons.append(
+                {
+                    "reason_code": reason_code,
+                    "model_name": model_name,
+                    "method_name": method_name,
+                    "details": details,
+                }
+            )
+
+        incident = self._create_incident()
+        with patch.object(
+            WorkflowEnforcementInterceptor,
+            "_record_incident",
+            side_effect=_capture_incident,
+        ):
+            with self.assertRaisesRegex(WorkflowGateBlockedError, "path is uncovered"):
+                incident.action_triage()
+
+        self.assertEqual(incident.state, "open")
+        self.assertEqual(
+            incident_reasons,
+            [
+                {
+                    "reason_code": "path_uncovered",
+                    "model_name": "workflow.incident",
+                    "method_name": "action_triage",
+                    "details": "No active binding resolved for patched path.",
+                }
+            ],
+        )
 
     def test_gate_blocked_error_is_not_masked_by_fail_closed_handler(self):
         binding = self._create_binding(
