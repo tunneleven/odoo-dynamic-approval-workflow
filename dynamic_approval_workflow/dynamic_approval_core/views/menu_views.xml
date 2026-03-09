@@ -38,7 +38,7 @@
     <menuitem id="menu_workflow_incidents"
               name="Incidents"
               parent="menu_workflow_root"
-              action="workflow_incident_action"
+              action="action_workflow_incident"
               groups="dynamic_approval_core.group_workflow_admin"
               sequence="50"/>
 

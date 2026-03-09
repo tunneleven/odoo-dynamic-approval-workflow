@@ -2,28 +2,29 @@
 <odoo>
 
     <!-- ======== Tree ======== -->
-    <record id="workflow_incident_view_list" model="ir.ui.view">
+    <record id="view_workflow_incident_list" model="ir.ui.view">
         <field name="name">workflow.incident.list</field>
         <field name="model">workflow.incident</field>
         <field name="arch" type="xml">
             <list>
                 <field name="name"/>
-                <field name="category"/>
+                <field name="category" widget="badge"/>
                 <field name="severity"
+                       widget="badge"
                        decoration-danger="severity == 'critical'"
                        decoration-warning="severity == 'high'"/>
                 <field name="state" widget="badge"/>
                 <field name="instance_id"/>
                 <field name="opened_at_utc"/>
-                <field name="company_id" groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
 
     <!-- ======== Form ======== -->
-    <record id="workflow_incident_view_form" model="ir.ui.view">
+    <record id="view_workflow_incident_form" model="ir.ui.view">
         <field name="name">workflow.incident.form</field>
         <field name="model">workflow.incident</field>
+        <field name="priority" eval="10"/>
         <field name="arch" type="xml">
             <form>
                 <header>
@@ -42,8 +43,8 @@
                             class="btn-success"
                             invisible="state not in ('triaged', 'retry_scheduled')"
                             groups="dynamic_approval_core.group_workflow_admin"/>
-                    <button name="action_close_with_exception" type="object"
-                            string="Close With Exception"
+                    <button name="action_close" type="object"
+                            string="Close"
                             class="btn-warning"
                             invisible="state != 'resolved'"
                             groups="dynamic_approval_core.group_workflow_admin"/>
@@ -52,25 +53,24 @@
                 </header>
                 <sheet>
                     <group>
-                        <group>
+                        <group string="Incident">
+                            <field name="name"/>
                             <field name="category"/>
-                            <field name="severity"/>
+                            <field name="severity" widget="badge"/>
                             <field name="instance_id"/>
-                        </group>
-                        <group>
                             <field name="reason_code"/>
+                        </group>
+                        <group string="Resolution">
+                            <field name="state" readonly="1"/>
                             <field name="resolution_action"/>
+                            <field name="opened_at_utc"/>
+                            <field name="resolved_at_utc"/>
                             <field name="correlation_id"/>
-                            <field name="company_id" groups="base.group_multi_company"/>
                         </group>
                     </group>
-                    <group>
+                    <group string="Details">
                         <field name="description"/>
                         <field name="resolution_note"/>
-                    </group>
-                    <group>
-                        <field name="opened_at_utc"/>
-                        <field name="resolved_at_utc"/>
                     </group>
                 </sheet>
                 <chatter/>
@@ -78,11 +78,40 @@
         </field>
     </record>
 
+    <!-- ======== Search ======== -->
+    <record id="view_workflow_incident_search" model="ir.ui.view">
+        <field name="name">workflow.incident.search</field>
+        <field name="model">workflow.incident</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="category"/>
+                <field name="severity"/>
+                <field name="state"/>
+                <field name="instance_id"/>
+                <filter name="open_incidents"
+                        string="Open"
+                        domain="[('state', '=', 'open')]"/>
+                <filter name="critical_incidents"
+                        string="Critical"
+                        domain="[('severity', '=', 'critical')]"/>
+                <separator/>
+                <filter name="group_by_category"
+                        string="By Category"
+                        context="{'group_by': 'category'}"/>
+                <filter name="group_by_severity"
+                        string="By Severity"
+                        context="{'group_by': 'severity'}"/>
+            </search>
+        </field>
+    </record>
+
     <!-- ======== Action ======== -->
-    <record id="workflow_incident_action" model="ir.actions.act_window">
+    <record id="action_workflow_incident" model="ir.actions.act_window">
         <field name="name">Incidents</field>
         <field name="res_model">workflow.incident</field>
         <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_workflow_incident_search"/>
+        <field name="group_ids" eval="[(6, 0, [ref('dynamic_approval_core.group_workflow_admin')])]"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No incidents — everything running smoothly
