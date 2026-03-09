@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from psycopg2.errors import UniqueViolation
 
 from odoo.exceptions import ValidationError
@@ -139,6 +141,21 @@ class TestWorkflowBinding(TransactionCase):
 
         binding.write({"binding_priority": 300})
         self.assertEqual(binding.interceptor_config_revision, 3)
+
+    def test_binding_crud_refreshes_interceptor_patches(self):
+        binding_model = type(self.env["workflow.binding"])
+        with patch.object(binding_model, "_refresh_interceptor_patches") as refresh_patches:
+            binding = self._create_binding(is_active=True)
+            create_refresh_count = refresh_patches.call_count
+            self.assertGreaterEqual(create_refresh_count, 1)
+
+            binding.write({"binding_priority": 250})
+            write_refresh_count = refresh_patches.call_count
+            self.assertGreater(write_refresh_count, create_refresh_count)
+
+            binding.unlink()
+            self.assertGreater(refresh_patches.call_count, write_refresh_count)
+            self.assertFalse(binding.exists())
 
     def test_execute_callback_resolves_execution_principal(self):
         request_actor_binding = self._create_binding(
