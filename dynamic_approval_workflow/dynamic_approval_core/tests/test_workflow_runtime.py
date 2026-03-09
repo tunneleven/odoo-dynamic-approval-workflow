@@ -1,6 +1,7 @@
 import json
 
 from odoo import fields
+from odoo.exceptions import AccessError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
@@ -17,6 +18,50 @@ class TestWorkflowRuntime(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.group_admin = cls.env.ref("dynamic_approval_core.group_workflow_admin")
+        cls.group_approver = cls.env.ref("dynamic_approval_core.group_workflow_approver")
+        cls.workflow_admin_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Runtime Workflow Admin",
+                    "login": "runtime_workflow_admin@example.com",
+                    "email": "runtime_workflow_admin@example.com",
+                    "group_ids": [(6, 0, [cls.group_admin.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
+        )
+        cls.requester_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Runtime Requester",
+                    "login": "runtime_requester@example.com",
+                    "email": "runtime_requester@example.com",
+                    "group_ids": [(6, 0, [cls.group_approver.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
+        )
+        cls.other_approver_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Runtime Other Approver",
+                    "login": "runtime_other_approver@example.com",
+                    "email": "runtime_other_approver@example.com",
+                    "group_ids": [(6, 0, [cls.group_approver.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
+        )
         cls.definition = cls.env["workflow.definition"].create(
             {
                 "name": "Runtime Workflow",
@@ -26,7 +71,7 @@ class TestWorkflowRuntime(TransactionCase):
         cls.partner = cls.env["res.partner"].create({"name": "Runtime Resource"})
         cls._version_index = 0
 
-    def _create_published_version(self, compiled_data):
+    def _create_published_version(self, compiled_data, condition_rules=None):
         """Create a published workflow version with a compiled runtime artifact."""
         type(self)._version_index += 1
         version_number = type(self)._version_index
@@ -48,29 +93,37 @@ class TestWorkflowRuntime(TransactionCase):
                 "gateway_count": gateway_count,
             }
         )
-        return self.env["workflow.definition.version"].create(
+        version = self.env["workflow.definition.version"].create(
             {
                 "definition_id": self.definition.id,
-                "version": version_number,
-                "state": "published",
                 "bpmn_xml": bpmn_xml,
-                "bpmn_hash": bpmn_hash,
                 "effective_from_utc": fields.Datetime.now(),
-                "published_at_utc": fields.Datetime.now(),
-                "published_by_id": self.env.user.id,
                 "compiled_id": compiled.id,
             }
         )
+        for rule_vals in condition_rules or []:
+            self.env["workflow.condition.rule"].create(
+                {
+                    "definition_version_id": version.id,
+                    **rule_vals,
+                }
+            )
+        version.action_publish()
+        self.assertTrue(version.version, "Published versions should receive a version number.")
+        self.assertEqual(version.compiled_id, compiled, "Published version should keep the compiled runtime artifact.")
+        self.assertEqual(version.bpmn_hash, bpmn_hash, "Published version should store the compiled BPMN hash.")
+        return version
 
-    def _create_instance(self, version):
+    def _create_instance(self, version, requester=None):
         """Create a workflow instance bound to the shared partner record."""
+        requester = requester or self.env.user
         return self.env["workflow.instance"].create(
             {
                 "definition_id": self.definition.id,
                 "definition_version_id": version.id,
                 "res_model": "res.partner",
                 "res_id": self.partner.id,
-                "requester_id": self.env.user.id,
+                "requester_id": requester.id,
             }
         )
 
@@ -166,7 +219,14 @@ class TestWorkflowRuntime(TransactionCase):
                         "id": "Gateway_1",
                         "type": "exclusive_gateway",
                         "outgoing": [
-                            {"target_node_id": "EndEvent_Approved", "sequence": 10},
+                            {
+                                "target_node_id": "EndEvent_Approved",
+                                "sequence": 10,
+                                "condition": {
+                                    "condition_type": "domain",
+                                    "domain_filter": json.dumps([["id", "=", self.partner.id]]),
+                                },
+                            },
                             {"target_node_id": "EndEvent_Rejected", "sequence": 20, "is_default": True},
                         ],
                     },
@@ -181,28 +241,7 @@ class TestWorkflowRuntime(TransactionCase):
                         "final_state": "completed_rejected",
                     },
                 ],
-            }
-        )
-        self.env["workflow.condition.rule"].create(
-            {
-                "name": "Partner Match",
-                "definition_version_id": version.id,
-                "source_node_id": "Gateway_1",
-                "target_node_id": "EndEvent_Approved",
-                "condition_type": "domain",
-                "domain_filter": json.dumps([["id", "=", self.partner.id]]),
-            }
-        )
-        self.env["workflow.condition.rule"].create(
-            {
-                "name": "Default Rejection",
-                "definition_version_id": version.id,
-                "source_node_id": "Gateway_1",
-                "target_node_id": "EndEvent_Rejected",
-                "condition_type": "domain",
-                "domain_filter": json.dumps([["id", "=", 0]]),
-                "is_default": True,
-            }
+            },
         )
         instance = self._create_instance(version)
 
@@ -278,6 +317,106 @@ class TestWorkflowRuntime(TransactionCase):
             "Cancellation must emit the workflow.instance.cancelled event.",
         )
 
+    def test_runtime_actions_use_internal_elevation_for_requester_user(self):
+        """FR-021/FR-028: authorized requester users should mutate runtime via internal elevation."""
+        version = self._create_published_version(
+            {
+                "start_node_id": "StartEvent_1",
+                "nodes": [
+                    {
+                        "id": "StartEvent_1",
+                        "type": "start_event",
+                        "outgoing": ["UserTask_1"],
+                    },
+                    {
+                        "id": "UserTask_1",
+                        "type": "user_task",
+                        "name": "Approver Driven Task",
+                    },
+                ],
+            }
+        )
+        instance = self._create_instance(version, requester=self.requester_user)
+
+        instance.with_user(self.requester_user).action_start({"channel": "orm"})
+        self.assertEqual(instance.state, "waiting_human", "Requester-triggered start should advance the runtime.")
+
+        instance.with_user(self.requester_user).action_cancel("requester_cancelled")
+        self.assertEqual(
+            instance.state, "cancelled", "Requester-triggered cancel should succeed via internal runtime elevation."
+        )
+
+    def test_action_start_requires_requester_or_admin(self):
+        """FR-021: non-requester actors must not start workflow instances."""
+        version = self._create_published_version(
+            {
+                "start_node_id": "StartEvent_1",
+                "nodes": [
+                    {
+                        "id": "StartEvent_1",
+                        "type": "start_event",
+                        "outgoing": ["UserTask_1"],
+                    },
+                    {
+                        "id": "UserTask_1",
+                        "type": "user_task",
+                        "name": "Unauthorized Start",
+                    },
+                ],
+            }
+        )
+        instance = self._create_instance(version, requester=self.requester_user)
+
+        with self.assertRaises(AccessError):
+            instance.with_user(self.other_approver_user).action_start({"channel": "orm"})
+
+    def test_action_start_missing_condition_rule_incidents_instance(self):
+        """FR-023: missing condition rules should fail closed instead of routing the instance."""
+        version = self._create_published_version(
+            {
+                "start_node_id": "StartEvent_1",
+                "nodes": [
+                    {
+                        "id": "StartEvent_1",
+                        "type": "start_event",
+                        "outgoing": ["Gateway_1"],
+                    },
+                    {
+                        "id": "Gateway_1",
+                        "type": "exclusive_gateway",
+                        "outgoing": [
+                            {
+                                "target_node_id": "EndEvent_Approved",
+                                "sequence": 10,
+                                "condition_rule_id": 999999,
+                            },
+                            {"target_node_id": "EndEvent_Rejected", "sequence": 20, "is_default": True},
+                        ],
+                    },
+                    {
+                        "id": "EndEvent_Approved",
+                        "type": "end_event",
+                        "final_state": "completed_approved",
+                    },
+                    {
+                        "id": "EndEvent_Rejected",
+                        "type": "end_event",
+                        "final_state": "completed_rejected",
+                    },
+                ],
+            }
+        )
+        instance = self._create_instance(version)
+
+        instance.action_start({"channel": "orm"})
+
+        incident = self.env["workflow.incident"].search(
+            [("instance_id", "=", instance.id), ("reason_code", "=", "runtime_configuration_error")],
+            limit=1,
+        )
+        self.assertEqual(instance.state, "error_incident", "Missing condition rules must incident the runtime.")
+        self.assertTrue(incident, "Missing condition rules must record a runtime configuration incident.")
+
     def test_action_recover_requires_resolved_incidents(self):
         """FR-028: recover should block until the incident queue is resolved."""
         version = self._create_published_version({"nodes": []})
@@ -295,10 +434,43 @@ class TestWorkflowRuntime(TransactionCase):
         )
 
         with self.assertRaises(WorkflowRuntimeError):
-            instance.action_recover()
+            instance.with_user(self.workflow_admin_user).action_recover()
 
         incident.action_triage()
         incident.action_resolve()
-        instance.action_recover()
+        instance.with_user(self.workflow_admin_user).action_recover()
 
         self.assertEqual(instance.state, "running", "Recovered instances should re-enter the running state.")
+
+    def test_action_recover_requires_admin_actor(self):
+        """FR-068: recover should remain restricted to workflow admins."""
+        version = self._create_published_version({"nodes": []})
+        instance = self._create_instance(version, requester=self.requester_user)
+        instance.write({"state": "error_incident"})
+        incident = self.env["workflow.incident"].create(
+            {
+                "instance_id": instance.id,
+                "category": "integrity_failure",
+                "severity": "high",
+                "reason_code": "runtime_tick_failed",
+                "description": "Recover authorization test.",
+                "company_id": self.env.company.id,
+            }
+        )
+        incident.action_triage()
+        incident.action_resolve()
+
+        with self.assertRaises(AccessError):
+            instance.with_user(self.requester_user).action_recover()
+
+    def test_action_cancel_requires_admin_for_incidented_instances(self):
+        """FR-068: incidented-instance cancellation should remain admin-only."""
+        version = self._create_published_version({"nodes": []})
+        instance = self._create_instance(version, requester=self.requester_user)
+        instance.write({"state": "error_incident"})
+
+        with self.assertRaises(AccessError):
+            instance.with_user(self.requester_user).action_cancel("requester_cancelled_incident")
+
+        instance.with_user(self.workflow_admin_user).action_cancel("admin_cancelled_incident")
+        self.assertEqual(instance.state, "cancelled", "Workflow admins should be able to cancel incidented instances.")

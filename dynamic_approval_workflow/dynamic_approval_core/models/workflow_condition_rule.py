@@ -2,7 +2,7 @@ import json
 from json import JSONDecodeError
 
 from odoo import _, api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tools.safe_eval import safe_eval
 
 
@@ -60,6 +60,47 @@ class WorkflowConditionRule(models.Model):
         index=True,
         readonly=True,
     )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Block published-version edits and admin-gate python conditions."""
+        for vals in vals_list:
+            definition_version = (
+                self.env["workflow.definition.version"].browse(vals.get("definition_version_id")).exists()
+            )
+            if definition_version and definition_version.state == "published":
+                raise ValidationError(_("Published workflow versions are immutable; condition rules cannot be added."))
+            if vals.get("condition_type") == "python" and not (
+                self.env.is_superuser() or self.env.user.has_group("dynamic_approval_core.group_workflow_admin")
+            ):
+                raise AccessError(_("Only workflow admins can create python condition rules."))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        """Block mutation of published-version rules and non-admin python edits."""
+        if vals.get("condition_type") == "python" and not (
+            self.env.is_superuser() or self.env.user.has_group("dynamic_approval_core.group_workflow_admin")
+        ):
+            raise AccessError(_("Only workflow admins can assign python condition rules."))
+        for record in self:
+            if record.definition_version_id.state == "published":
+                raise ValidationError(
+                    _("Published workflow versions are immutable; condition rules cannot be modified.")
+                )
+            if record.condition_type == "python" and not (
+                self.env.is_superuser() or self.env.user.has_group("dynamic_approval_core.group_workflow_admin")
+            ):
+                raise AccessError(_("Only workflow admins can modify python condition rules."))
+        return super().write(vals)
+
+    def unlink(self):
+        """Block deletion of rules on published workflow versions."""
+        for record in self:
+            if record.definition_version_id.state == "published":
+                raise ValidationError(
+                    _("Published workflow versions are immutable; condition rules cannot be deleted.")
+                )
+        return super().unlink()
 
     @api.constrains("condition_type", "domain_filter", "python_code")
     def _check_condition_value(self):

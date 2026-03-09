@@ -46,6 +46,7 @@ class WorkflowNodeRuntime(models.Model):
         index=True,
     )
     sequence = fields.Integer(default=10)
+    loop_iteration = fields.Integer(default=1, readonly=True)
     activated_at_utc = fields.Datetime()
     completed_at_utc = fields.Datetime()
     company_id = fields.Many2one(

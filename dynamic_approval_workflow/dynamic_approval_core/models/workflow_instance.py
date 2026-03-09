@@ -5,6 +5,7 @@ import uuid
 from json import JSONDecodeError
 
 from odoo import _, api, fields, models
+from odoo.exceptions import AccessError
 
 from ..exceptions import WorkflowConfigurationError, WorkflowLockTimeoutError, WorkflowRuntimeError
 
@@ -159,115 +160,186 @@ class WorkflowInstance(models.Model):
             target_reference = "%s,%s" % (record.res_model or "", record.res_id or "")
             record.name = "%s / %s" % (definition_name, target_reference)
 
+    def _runtime_actor_id(self):
+        """Return the original actor ID for internal runtime side effects."""
+        self.ensure_one()
+        actor_id = self.env.context.get("workflow_actor_id")
+        if actor_id and self.env.is_superuser():
+            return actor_id
+        return self.env.user.id
+
+    def _get_runtime_actor_user(self):
+        """Return the effective actor user for runtime authorization checks."""
+        self.ensure_one()
+        actor = self.env["res.users"].browse(self._runtime_actor_id()).exists()
+        if not actor:
+            raise AccessError(_("Workflow runtime actor is invalid."))
+        return actor
+
+    def _runtime_admin_self(self, **context_updates):
+        """Return the instance with internal elevation for runtime persistence."""
+        self.ensure_one()
+        runtime_context = dict(self.env.context, workflow_actor_id=self._runtime_actor_id())
+        runtime_context.update(context_updates)
+        return self.with_context(runtime_context).sudo()
+
+    def _check_start_authorization(self):
+        """Ensure the runtime start actor is authorized."""
+        self.ensure_one()
+        actor = self._get_runtime_actor_user()
+        if actor == self.requester_id or actor.has_group("dynamic_approval_core.group_workflow_admin"):
+            return
+        raise AccessError(_("Only the requester or a workflow admin can start this workflow instance."))
+
+    def _check_cancel_authorization(self):
+        """Ensure the cancel actor is authorized."""
+        self.ensure_one()
+        actor = self._get_runtime_actor_user()
+        if self.state == "error_incident":
+            if actor.has_group("dynamic_approval_core.group_workflow_admin"):
+                return
+            raise AccessError(_("Only a workflow admin can cancel an incidented workflow instance."))
+        if actor == self.requester_id or actor.has_group("dynamic_approval_core.group_workflow_admin"):
+            return
+        raise AccessError(_("Only the requester or a workflow admin can cancel this workflow instance."))
+
+    def _check_recover_authorization(self):
+        """Ensure the recover actor is authorized."""
+        self.ensure_one()
+        actor = self._get_runtime_actor_user()
+        if actor.has_group("dynamic_approval_core.group_workflow_admin"):
+            return
+        raise AccessError(_("Only a workflow admin can recover this workflow instance."))
+
     def action_start(self, binding_context):
         """Start runtime execution for the pinned workflow version."""
         self.ensure_one()
         if not isinstance(binding_context, dict):
             raise WorkflowConfigurationError(_("Binding context must be a dictionary."))
 
-        self._validate_start_conditions()
-        start_node_spec = self._get_start_node_spec(self._get_compiled_artifact())
+        runtime_self = self._runtime_admin_self(workflow_binding_context=dict(binding_context))
+        runtime_self._check_start_authorization()
+        runtime_self._acquire_instance_lock()
+        runtime_self.invalidate_recordset()
+        runtime_self._validate_start_conditions()
+        start_node_spec = runtime_self._get_start_node_spec(runtime_self._get_compiled_artifact())
 
-        self.write(
+        runtime_self.write(
             {
-                "correlation_id": self.correlation_id or uuid.uuid4().hex,
-                "started_at_utc": self.started_at_utc or fields.Datetime.now(),
+                "correlation_id": runtime_self.correlation_id or uuid.uuid4().hex,
+                "started_at_utc": runtime_self.started_at_utc or fields.Datetime.now(),
             }
         )
-        start_node_runtime = self._create_node_runtime(start_node_spec)
-        self.env["workflow.token"].create(
+        start_node_runtime = runtime_self._create_node_runtime(start_node_spec)
+        runtime_self.env["workflow.token"].create(
             {
-                "instance_id": self.id,
+                "instance_id": runtime_self.id,
                 "node_runtime_id": start_node_runtime.id,
             }
         )
-        self._dispatch_post_commit([{"event_type": "workflow.instance.started", "instance_id": self.id}])
-        return self.with_context(workflow_binding_context=dict(binding_context))._tick()
+        runtime_self._dispatch_post_commit(
+            [{"event_type": "workflow.instance.started", "instance_id": runtime_self.id}]
+        )
+        runtime_self._tick()
+        self.invalidate_recordset()
+        return self
 
     def action_cancel(self, reason_code):
         """Cancel the runtime instance and close all active runtime records."""
         self.ensure_one()
         if not reason_code:
             raise WorkflowRuntimeError(_("Cancellation reason code is required."))
-        if self.state in self._terminal_states:
+        runtime_self = self._runtime_admin_self()
+        runtime_self._acquire_instance_lock()
+        runtime_self.invalidate_recordset()
+        runtime_self._check_cancel_authorization()
+        if runtime_self.state in self._terminal_states:
             raise WorkflowRuntimeError(_("Terminal workflow instances cannot be cancelled again."))
 
-        self._acquire_instance_lock()
-        self._cancel_active_runtime_records()
-        self._transition_state("cancelled")
-        self._dispatch_post_commit(
-            [{"event_type": "workflow.instance.cancelled", "instance_id": self.id, "reason_code": reason_code}]
+        runtime_self._cancel_active_runtime_records()
+        runtime_self._transition_state("cancelled")
+        runtime_self._dispatch_post_commit(
+            [{"event_type": "workflow.instance.cancelled", "instance_id": runtime_self.id, "reason_code": reason_code}]
         )
+        self.invalidate_recordset()
         return self
 
     def action_recover(self):
         """Recover an incidented instance after blocking incidents are resolved."""
         self.ensure_one()
-        if self.state != "error_incident":
+        runtime_self = self._runtime_admin_self()
+        runtime_self._check_recover_authorization()
+        runtime_self._acquire_instance_lock()
+        runtime_self.invalidate_recordset()
+        if runtime_self.state != "error_incident":
             raise WorkflowRuntimeError(_("Only incidented workflow instances can be recovered."))
-        if self._has_blocking_incident():
+        if runtime_self._has_blocking_incident():
             raise WorkflowRuntimeError(_("Resolve all blocking incidents before recovering the workflow instance."))
 
-        self._acquire_instance_lock()
-        self._transition_state("running")
-        return self._tick()
+        runtime_self._transition_state("running")
+        runtime_self._tick()
+        self.invalidate_recordset()
+        return self
 
     def _tick(self):
         """Run one deterministic runtime tick against persisted state."""
         self.ensure_one()
-        if self.state in self._terminal_states:
+        runtime_self = self._runtime_admin_self()
+        if runtime_self.state in runtime_self._terminal_states:
+            self.invalidate_recordset()
             return self
 
-        self._acquire_instance_lock()
-        if self.state in {"waiting_human", "waiting_timer"}:
-            self._transition_state("running")
+        runtime_self._acquire_instance_lock()
+        runtime_self.invalidate_recordset()
+        if runtime_self.state in {"waiting_human", "waiting_timer"}:
+            runtime_self._transition_state("running")
 
-        runtime_artifact = self._get_compiled_artifact()
-        target_record = self._get_target_record()
-        binding_context = dict(self.env.context.get("workflow_binding_context") or {})
+        runtime_artifact = runtime_self._get_compiled_artifact()
+        target_record = runtime_self._get_target_record()
+        binding_context = dict(runtime_self.env.context.get("workflow_binding_context") or {})
 
         try:
-            with self.env.cr.savepoint():
-                self._run_runtime_loop(runtime_artifact, target_record, binding_context)
-            self._update_aggregate_state(runtime_artifact=runtime_artifact)
+            with runtime_self.env.cr.savepoint():
+                runtime_self._run_runtime_loop(runtime_artifact, target_record, binding_context)
+            runtime_self._update_aggregate_state(runtime_artifact=runtime_artifact)
         except Exception as err:
-            self._handle_tick_failure(err)
+            runtime_self._handle_tick_failure(err)
+        self.invalidate_recordset()
         return self
 
-    def _evaluate_gate_condition(
-        self, source_node_id, target_node_id, target_record, binding_context, condition_rule_id=None
-    ):
-        """Dispatch compiled route conditions to ``workflow.condition.rule``."""
+    def _evaluate_gate_condition(self, path_spec, target_record, binding_context):
+        """Evaluate compiled route conditions via ``workflow.condition.rule`` helpers."""
         self.ensure_one()
-        rule_domain = [("definition_version_id", "=", self.definition_version_id.id)]
-        if condition_rule_id:
-            rule_domain.append(("id", "=", condition_rule_id))
-        else:
-            rule_domain.extend(
-                [
-                    ("source_node_id", "=", source_node_id),
-                    ("target_node_id", "=", target_node_id),
-                ]
-            )
-        rules = self.env["workflow.condition.rule"].search(rule_domain, order="sequence, id")
-        non_default_rules = rules.filtered(lambda rule: not rule.is_default)
-        if not rules:
+        condition_values = dict(path_spec.get("condition_values") or {})
+        if not condition_values:
+            if path_spec.get("condition_rule_id"):
+                raise WorkflowConfigurationError(
+                    _("Compiled workflow route references missing condition metadata for rule '%s'.")
+                    % path_spec["condition_rule_id"]
+                )
             return None
-        if not non_default_rules:
-            return False
 
         evaluation_context = {
             "binding_context": dict(binding_context or {}),
             "instance_id": self.id,
             "correlation_id": self.correlation_id,
         }
-        for rule in non_default_rules:
-            try:
-                if rule.evaluate(target_record, evaluation_context):
-                    return True
-            except Exception:
-                return False
-        return False
+        rule_record = self.env["workflow.condition.rule"].new(
+            {
+                "name": condition_values.get("name") or path_spec["target_node_id"],
+                "definition_version_id": self.definition_version_id.id,
+                "source_node_id": path_spec.get("source_node_id") or False,
+                "target_node_id": path_spec["target_node_id"],
+                "condition_type": condition_values.get("condition_type") or "domain",
+                "domain_filter": condition_values.get("domain_filter"),
+                "python_code": condition_values.get("python_code"),
+                "is_default": bool(condition_values.get("is_default")),
+            }
+        )
+        try:
+            return bool(rule_record.evaluate(target_record, evaluation_context))
+        except Exception:
+            return False
 
     def _dispatch_post_commit(self, events):
         """Persist workflow lifecycle events for downstream dispatching."""
@@ -277,6 +349,7 @@ class WorkflowInstance(models.Model):
             return []
 
         audit_event_model = self.env["workflow.audit.event"].sudo()
+        actor_id = self._runtime_actor_id()
         for event in queued_events:
             payload = dict(event)
             event_type = payload.pop("event_type")
@@ -285,7 +358,7 @@ class WorkflowInstance(models.Model):
             audit_event_model.create(
                 {
                     "event_type": event_type,
-                    "actor_id": self.env.user.id,
+                    "actor_id": actor_id,
                     "object_ref": payload.get("object_ref") or "workflow.instance,%s" % self.id,
                     "payload": payload_str,
                     "payload_hash": payload_hash,
@@ -399,7 +472,8 @@ class WorkflowInstance(models.Model):
             raise WorkflowRuntimeError(_("Workflow instance is missing its target record reference."))
         if self.res_model not in self.env:
             raise WorkflowRuntimeError(_("Workflow instance target model '%s' is not installed.") % self.res_model)
-        target_record = self.env[self.res_model].browse(self.res_id).exists()
+        actor_user = self._get_runtime_actor_user()
+        target_record = self.env[self.res_model].with_user(actor_user).browse(self.res_id).exists()
         if not target_record:
             raise WorkflowRuntimeError(_("Workflow instance target record no longer exists."))
         return target_record
@@ -489,40 +563,15 @@ class WorkflowInstance(models.Model):
                 default_path = path
                 continue
 
-            evaluation = self._evaluate_gate_condition(
-                node_spec["id"],
-                path["target_node_id"],
-                target_record,
-                binding_context,
-                condition_rule_id=path["condition_rule_id"],
-            )
+            evaluation = self._evaluate_gate_condition(path, target_record, binding_context)
             if evaluation is None:
                 return [path]
             if evaluation:
                 return [path]
-            if default_path is None and self._path_has_default_rule(
-                node_spec["id"], path["target_node_id"], path["condition_rule_id"]
-            ):
-                default_path = path
 
         if default_path:
             return [default_path]
         raise WorkflowRuntimeError(_("Exclusive gateway '%s' has no matching outgoing path.") % node_spec["id"])
-
-    def _path_has_default_rule(self, source_node_id, target_node_id, condition_rule_id=None):
-        """Return whether the candidate path is the configured default route."""
-        self.ensure_one()
-        rule_domain = [("definition_version_id", "=", self.definition_version_id.id), ("is_default", "=", True)]
-        if condition_rule_id:
-            rule_domain.append(("id", "=", condition_rule_id))
-        else:
-            rule_domain.extend(
-                [
-                    ("source_node_id", "=", source_node_id),
-                    ("target_node_id", "=", target_node_id),
-                ]
-            )
-        return bool(self.env["workflow.condition.rule"].search_count(rule_domain))
 
     def _get_node_spec(self, runtime_artifact, node_id):
         """Return a normalized node specification from the compiled artifact."""
@@ -628,6 +677,13 @@ class WorkflowInstance(models.Model):
             "sequence": raw_path.get("sequence") or default_sequence,
             "is_default": bool(raw_path.get("is_default") or raw_path.get("default")),
             "condition_rule_id": raw_path.get("condition_rule_id"),
+            "source_node_id": raw_path.get("source_node_id") or raw_path.get("source") or raw_path.get("sourceRef"),
+            "condition_values": raw_path.get("condition")
+            or {
+                key: raw_path[key]
+                for key in ("name", "condition_type", "domain_filter", "python_code", "is_default")
+                if key in raw_path
+            },
         }
 
     def _activate_path(self, parent_token, runtime_artifact, path_spec):
@@ -745,7 +801,7 @@ class WorkflowInstance(models.Model):
             ]
         )
         if active_runtimes:
-            active_runtimes.write({"state": "skipped"})
+            active_runtimes.write({"state": "skipped", "completed_at_utc": fields.Datetime.now()})
 
     def _handle_tick_failure(self, err):
         """Persist the incident state after an engine failure."""
