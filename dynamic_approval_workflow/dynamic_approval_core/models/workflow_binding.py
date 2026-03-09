@@ -103,65 +103,46 @@ class WorkflowBinding(models.Model):
     def _check_target_model_exists(self):
         for record in self:
             if not record._is_installed_model(record.target_model):
-                raise ValidationError(
-                    _("Target model '%s' is not installed.") % (record.target_model or "")
-                )
+                raise ValidationError(_("Target model '%s' is not installed.") % (record.target_model or ""))
 
     @api.constrains("enforcement_mode", "compliance_critical")
     def _check_ui_only_not_compliance(self):
         for record in self:
             if record.enforcement_mode == "ui_only" and record.compliance_critical:
-                raise ValidationError(
-                    _("Enforcement mode 'ui_only' is forbidden for compliance critical bindings.")
-                )
+                raise ValidationError(_("Enforcement mode 'ui_only' is forbidden for compliance critical bindings."))
 
     @api.constrains("callback_model", "callback_method")
     def _check_callback_pair(self):
         for record in self:
             if bool(record.callback_model) != bool(record.callback_method):
-                raise ValidationError(
-                    _("Callback model and callback method must both be set or both empty.")
-                )
+                raise ValidationError(_("Callback model and callback method must both be set or both empty."))
             if record.callback_model:
                 record._validate_callback_model()
 
     @api.constrains("callback_execution_principal", "callback_service_user_id")
     def _check_service_principal_user(self):
         for record in self:
-            if (
-                record.callback_execution_principal == "service_principal"
-                and not record.callback_service_user_id
-            ):
-                raise ValidationError(
-                    _("Service principal requires a callback service user.")
-                )
+            if record.callback_execution_principal == "service_principal" and not record.callback_service_user_id:
+                raise ValidationError(_("Service principal requires a callback service user."))
 
     @api.constrains("target_action_method", "callback_method")
     def _check_method_format(self):
         for record in self:
             if not self._method_name_regex.fullmatch(record.target_action_method or ""):
-                raise ValidationError(
-                    _("Target action method must match ^[a-z_][a-z0-9_]*$.")
-                )
+                raise ValidationError(_("Target action method must match ^[a-z_][a-z0-9_]*$."))
             if record.callback_method and not self._method_name_regex.fullmatch(record.callback_method):
-                raise ValidationError(
-                    _("Callback method must match ^[a-z_][a-z0-9_]*$.")
-                )
+                raise ValidationError(_("Callback method must match ^[a-z_][a-z0-9_]*$."))
 
     def _validate_callback_model(self):
         self.ensure_one()
         callback_target = self.callback_model or ""
         if self._looks_like_url(callback_target):
             if not self._is_https_url(callback_target):
-                raise ValidationError(
-                    _("Callback URL must use HTTPS.")
-                )
+                raise ValidationError(_("Callback URL must use HTTPS."))
             return
 
         if not self._is_installed_model(callback_target):
-            raise ValidationError(
-                _("Callback model '%s' is not installed.") % callback_target
-            )
+            raise ValidationError(_("Callback model '%s' is not installed.") % callback_target)
 
     def _is_installed_model(self, model_name):
         return bool(model_name) and model_name in self.env
@@ -238,8 +219,7 @@ class WorkflowBinding(models.Model):
         callback_model = self.env[self.callback_model].with_user(callback_user)
         if not hasattr(callback_model, self.callback_method):
             raise ValidationError(
-                _("Callback method '%s' does not exist on model '%s'.")
-                % (self.callback_method, self.callback_model)
+                _("Callback method '%s' does not exist on model '%s'.") % (self.callback_method, self.callback_model)
             )
         return {
             "status": "ready",
@@ -259,32 +239,21 @@ class WorkflowBinding(models.Model):
         if principal == "service_principal":
             callback_user = self.callback_service_user_id
             if not callback_user:
-                raise ValidationError(
-                    _("Service principal requires a callback service user.")
-                )
+                raise ValidationError(_("Service principal requires a callback service user."))
         elif principal == "approver_actor":
             approver_user_id = payload.get("effective_actor_user_id")
             if not approver_user_id:
-                raise ValidationError(
-                    _("Approver actor callbacks require payload key 'effective_actor_user_id'.")
-                )
+                raise ValidationError(_("Approver actor callbacks require payload key 'effective_actor_user_id'."))
             callback_user = self.env["res.users"].browse(approver_user_id).exists()
             if not callback_user:
-                raise ValidationError(
-                    _("Approver actor callback user '%s' does not exist.") % approver_user_id
-                )
+                raise ValidationError(_("Approver actor callback user '%s' does not exist.") % approver_user_id)
             if not callback_user.active:
-                raise ValidationError(
-                    _("Approver actor callback user '%s' is inactive.")
-                    % callback_user.display_name
-                )
+                raise ValidationError(_("Approver actor callback user '%s' is inactive.") % callback_user.display_name)
         else:
             callback_user = self.env.user
 
         if principal == "service_principal" and not callback_user.active:
-            raise ValidationError(
-                _("Callback execution user '%s' is inactive.") % callback_user.display_name
-            )
+            raise ValidationError(_("Callback execution user '%s' is inactive.") % callback_user.display_name)
 
         return callback_user
 
@@ -311,13 +280,8 @@ class WorkflowBinding(models.Model):
             )
 
     def write(self, vals):
-        if (
-            any(field in vals for field in ("target_model", "target_action_method"))
-            and any(self.mapped("is_active"))
-        ):
-            raise ValidationError(
-                _("Target model and action method are immutable once the binding is enabled.")
-            )
+        if any(field in vals for field in ("target_model", "target_action_method")) and any(self.mapped("is_active")):
+            raise ValidationError(_("Target model and action method are immutable once the binding is enabled."))
 
         should_bump_revision = (
             not self.env.context.get("skip_binding_revision_increment")

@@ -19,15 +19,19 @@ class TestWorkflowEnforcement(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.group_workflow_admin = cls.env.ref("dynamic_approval_core.group_workflow_admin")
-        cls.workflow_admin_user = cls.env["res.users"].with_context(no_reset_password=True).create(
-            {
-                "name": "Workflow Admin User",
-                "login": "workflow_admin_user@example.com",
-                "email": "workflow_admin_user@example.com",
-                "group_ids": [(6, 0, [cls.group_workflow_admin.id])],
-                "company_id": cls.env.company.id,
-                "company_ids": [(6, 0, [cls.env.company.id])],
-            }
+        cls.workflow_admin_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Workflow Admin User",
+                    "login": "workflow_admin_user@example.com",
+                    "email": "workflow_admin_user@example.com",
+                    "group_ids": [(6, 0, [cls.group_workflow_admin.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
         )
         cls.definition = cls.env["workflow.definition"].create(
             {

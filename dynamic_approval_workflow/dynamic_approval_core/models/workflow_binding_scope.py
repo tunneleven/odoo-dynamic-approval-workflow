@@ -72,17 +72,14 @@ class WorkflowBindingScope(models.Model):
         self.ensure_one()
         target_model = self.binding_id.target_model
         if not (bool(target_model) and target_model in self.env):
-            raise ValidationError(
-                _("Cannot validate scope domain: target model '%s' is not installed.") % target_model
-            )
+            raise ValidationError(_("Cannot validate scope domain: target model '%s' is not installed.") % target_model)
 
         model_fields = self.env[target_model]._fields
         for field_name in self._iter_domain_field_names(domain_expression):
             root_field = field_name.split(".", 1)[0]
             if root_field not in model_fields:
                 raise ValidationError(
-                    _("Scope domain references unknown field '%s' on model '%s'.")
-                    % (field_name, target_model)
+                    _("Scope domain references unknown field '%s' on model '%s'.") % (field_name, target_model)
                 )
 
     @classmethod

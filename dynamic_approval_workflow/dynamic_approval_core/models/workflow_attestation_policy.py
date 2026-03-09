@@ -54,6 +54,4 @@ class WorkflowAttestationPolicy(models.Model):
     def _check_legal_blocks_attestation(self):
         for record in self:
             if record.legal_human_signature_required and record.allow_system_attestation_on_timeout:
-                raise ValidationError(
-                    _("Legal-signature steps cannot allow system attestation on timeout.")
-                )
+                raise ValidationError(_("Legal-signature steps cannot allow system attestation on timeout."))

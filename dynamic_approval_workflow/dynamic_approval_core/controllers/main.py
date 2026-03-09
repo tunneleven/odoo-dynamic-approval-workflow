@@ -1,5 +1,4 @@
 from odoo import http
-from odoo.http import request
 
 
 class WorkflowController(http.Controller):

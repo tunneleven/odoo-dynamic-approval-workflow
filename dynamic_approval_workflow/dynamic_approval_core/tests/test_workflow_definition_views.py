@@ -48,7 +48,9 @@ class TestWorkflowDefinitionViews(TransactionCase):
         self.assertTrue(enable_buttons, "Binding form must expose Enable in the header")
         self.assertTrue(disable_buttons, "Binding form must expose Disable in the header")
 
-        stat_buttons = root.xpath("//div[contains(@class, 'oe_button_box')]//button[contains(@class, 'oe_stat_button')]")
+        stat_buttons = root.xpath(
+            "//div[contains(@class, 'oe_button_box')]//button[contains(@class, 'oe_stat_button')]"
+        )
         self.assertTrue(stat_buttons, "Binding form must include a stat button box")
 
         scope_list_nodes = root.xpath("//page[@string='Scopes']//field[@name='scope_ids']/list")
@@ -94,10 +96,7 @@ class TestWorkflowDefinitionViews(TransactionCase):
     def test_binding_list_and_search_views_match_omb_contract(self):
         list_view = self.env.ref("dynamic_approval_core.view_workflow_binding_list")
         list_root = etree.fromstring(list_view.arch_db.encode())
-        actual_columns = [
-            (field.get("name"), field.get("widget"))
-            for field in list_root.xpath("//list/field")
-        ]
+        actual_columns = [(field.get("name"), field.get("widget")) for field in list_root.xpath("//list/field")]
         self.assertEqual(
             actual_columns,
             [

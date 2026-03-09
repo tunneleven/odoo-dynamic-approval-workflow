@@ -124,9 +124,7 @@ class WorkflowApproverResolution(models.Model):
             if record.fallback_type == "fallback_group" and not record.fallback_group_id:
                 raise ValidationError(_("Fallback Group is required when fallback source is 'fallback_group'."))
             if record.fallback_type == "fallback_named_users" and not record.fallback_user_ids:
-                raise ValidationError(
-                    _("Fallback Users are required when fallback source is 'fallback_named_users'.")
-                )
+                raise ValidationError(_("Fallback Users are required when fallback source is 'fallback_named_users'."))
             if record.fallback_type != "fallback_group" and record.fallback_group_id:
                 raise ValidationError(_("Fallback Group can only be set for 'fallback_group'."))
             if record.fallback_type != "fallback_named_users" and record.fallback_user_ids:
@@ -328,14 +326,12 @@ class WorkflowApproverResolution(models.Model):
                     % {"path": self.field_path, "segment": field_name}
                 )
             raise WorkflowConfigurationError(
-                _("Field Path '%(path)s' must end on a user-compatible relational field.")
-                % {"path": self.field_path}
+                _("Field Path '%(path)s' must end on a user-compatible relational field.") % {"path": self.field_path}
             )
 
         if current._name not in {"res.users", "res.partner"}:
             raise WorkflowConfigurationError(
-                _("Field Path '%(path)s' must end on a user-compatible relational field.")
-                % {"path": self.field_path}
+                _("Field Path '%(path)s' must end on a user-compatible relational field.") % {"path": self.field_path}
             )
         return self._coerce_records_to_users(current)
 
@@ -386,9 +382,7 @@ class WorkflowApproverResolution(models.Model):
     def _create_no_approver_incident(self, instance, context=None):
         """Create the documented no-approver incident."""
         self.ensure_one()
-        description = _(
-            "No approvers resolved for node '%(node)s' using rule '%(rule)s' (%(source)s)."
-        ) % {
+        description = _("No approvers resolved for node '%(node)s' using rule '%(rule)s' (%(source)s).") % {
             "node": self.node_id,
             "rule": self.name,
             "source": self.resolution_type,
@@ -434,9 +428,7 @@ class WorkflowApproverResolution(models.Model):
         """Block activation when policy rules exclude every active approver."""
         self.ensure_one()
         raise WorkflowSecurityPolicyError(
-            _(
-                "Approver resolution for node '%(node)s' is blocked by anti-self approval or separation-of-duty policy."
-            )
+            _("Approver resolution for node '%(node)s' is blocked by anti-self approval or separation-of-duty policy.")
             % {"node": self.node_id or instance.id}
         )
 

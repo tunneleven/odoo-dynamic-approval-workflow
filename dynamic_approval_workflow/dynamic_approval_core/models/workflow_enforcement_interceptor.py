@@ -44,11 +44,15 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
         with cls._patch_lock:
             cls._remove_patches(env)
 
-            bindings = env["workflow.binding"].sudo().search(
-                [
-                    ("is_active", "=", True),
-                    ("enforcement_mode", "in", ("orm_enforced", "hybrid")),
-                ]
+            bindings = (
+                env["workflow.binding"]
+                .sudo()
+                .search(
+                    [
+                        ("is_active", "=", True),
+                        ("enforcement_mode", "in", ("orm_enforced", "hybrid")),
+                    ]
+                )
             )
             for binding in bindings:
                 model_name = binding.target_model
@@ -114,9 +118,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
                     method_name=method_name,
                     details="No active binding resolved for patched path.",
                 )
-                raise WorkflowGateBlockedError(
-                    _("Workflow interception path is uncovered. Action is blocked.")
-                )
+                raise WorkflowGateBlockedError(_("Workflow interception path is uncovered. Action is blocked."))
 
             record_context = {
                 "model": model_name,
@@ -140,9 +142,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
                     method_name=method_name,
                     details=str(err),
                 )
-                raise WorkflowGateBlockedError(
-                    _("Workflow gate evaluation failed. Action is blocked.")
-                ) from err
+                raise WorkflowGateBlockedError(_("Workflow gate evaluation failed. Action is blocked.")) from err
 
             state = cls._normalize_gate_state(gate_result)
             reason_code = cls._extract_reason_code(gate_result)
@@ -161,9 +161,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
             )
 
             if state == "blocked":
-                raise WorkflowGateBlockedError(
-                    policy_message or _("Action is blocked by workflow policy.")
-                )
+                raise WorkflowGateBlockedError(policy_message or _("Action is blocked by workflow policy."))
 
             if state not in {"allowed", "allowed_with_warning"}:
                 cls._record_incident(
@@ -173,9 +171,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
                     method_name=method_name,
                     details="Gate state '%s' is unsupported." % state,
                 )
-                raise WorkflowGateBlockedError(
-                    _("Workflow gate returned invalid state. Action is blocked.")
-                )
+                raise WorkflowGateBlockedError(_("Workflow gate returned invalid state. Action is blocked."))
 
             return original_method(recordset, *args, **kwargs)
 
@@ -192,16 +188,20 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
     @staticmethod
     def _resolve_binding(env, model_name, method_name, company_id):
         """Resolve active binding by model + method + company context."""
-        return env["workflow.binding"].sudo().search(
-            [
-                ("is_active", "=", True),
-                ("target_model", "=", model_name),
-                ("target_action_method", "=", method_name),
-                ("enforcement_mode", "in", ("orm_enforced", "hybrid")),
-                ("company_id", "in", [company_id, False]),
-            ],
-            order="binding_priority desc, id asc",
-            limit=1,
+        return (
+            env["workflow.binding"]
+            .sudo()
+            .search(
+                [
+                    ("is_active", "=", True),
+                    ("target_model", "=", model_name),
+                    ("target_action_method", "=", method_name),
+                    ("enforcement_mode", "in", ("orm_enforced", "hybrid")),
+                    ("company_id", "in", [company_id, False]),
+                ],
+                order="binding_priority desc, id asc",
+                limit=1,
+            )
         )
 
     @staticmethod
@@ -241,11 +241,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
     def _extract_policy_message(gate_result):
         if not isinstance(gate_result, dict):
             return _("Workflow gate response is invalid.")
-        return (
-            gate_result.get("policy_message")
-            or gate_result.get("warning_message")
-            or ""
-        )
+        return gate_result.get("policy_message") or gate_result.get("warning_message") or ""
 
     @classmethod
     def _log_gate_event(
@@ -304,10 +300,7 @@ class WorkflowEnforcementInterceptor(models.AbstractModel):
                 "category": "enforcement_failure",
                 "severity": "critical",
                 "reason_code": reason_code,
-                "description": (
-                    "Interceptor fail-closed on %s.%s: %s"
-                    % (model_name, method_name, details)
-                ),
+                "description": ("Interceptor fail-closed on %s.%s: %s" % (model_name, method_name, details)),
                 "opened_at_utc": fields.Datetime.now(),
                 "company_id": env.company.id,
             }
