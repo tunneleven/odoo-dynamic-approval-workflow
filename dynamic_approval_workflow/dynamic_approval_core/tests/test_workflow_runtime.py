@@ -267,6 +267,69 @@ class TestWorkflowRuntime(TransactionCase):
             "Terminal routing must emit the workflow.instance.completed event.",
         )
 
+    def test_action_start_parallel_gateway_forks_tokens_and_creates_tasks(self):
+        """FR-022: runtime start should fork one token per parallel branch."""
+        version = self._create_published_version(
+            {
+                "start_node_id": "StartEvent_1",
+                "nodes": [
+                    {
+                        "id": "StartEvent_1",
+                        "type": "start_event",
+                        "outgoing": ["Gateway_1"],
+                    },
+                    {
+                        "id": "Gateway_1",
+                        "type": "parallel_gateway",
+                        "outgoing": ["UserTask_A", "UserTask_B"],
+                    },
+                    {
+                        "id": "UserTask_A",
+                        "type": "user_task",
+                        "name": "Parallel Approval A",
+                    },
+                    {
+                        "id": "UserTask_B",
+                        "type": "user_task",
+                        "name": "Parallel Approval B",
+                    },
+                ],
+            }
+        )
+        instance = self._create_instance(version)
+
+        instance.action_start({"channel": "orm"})
+
+        active_tokens = self.env["workflow.token"].search(
+            [("instance_id", "=", instance.id), ("state", "=", "active")],
+            order="id",
+        )
+        open_tasks = self.env["workflow.task"].search(
+            [("instance_id", "=", instance.id), ("status", "not in", ("completed", "cancelled"))],
+            order="id",
+        )
+
+        self.assertEqual(
+            instance.state, "waiting_human", "Parallel human branches should leave the instance waiting on humans."
+        )
+        self.assertEqual(len(active_tokens), 2, "Parallel split should leave one active token per branch.")
+        self.assertEqual(
+            sorted(active_tokens.mapped("node_runtime_id.node_id")),
+            ["UserTask_A", "UserTask_B"],
+            "Forked runtime tokens should advance to each configured branch node.",
+        )
+        self.assertEqual(
+            len(set(active_tokens.mapped("branch_id"))),
+            1,
+            "Forked branch tokens should share a branch group identifier for future joins.",
+        )
+        self.assertEqual(len(open_tasks), 2, "Each active human branch should create its own workflow task.")
+        self.assertEqual(
+            sorted(open_tasks.mapped("name")),
+            ["Parallel Approval A", "Parallel Approval B"],
+            "Parallel branch tasks should use the compiled node labels.",
+        )
+
     def test_action_cancel_cancels_open_runtime_records(self):
         """FR-028: cancel should close tokens, tasks, and node runtimes consistently."""
         version = self._create_published_version(

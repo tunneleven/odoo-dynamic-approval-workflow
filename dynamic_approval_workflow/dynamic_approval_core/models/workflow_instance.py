@@ -517,7 +517,7 @@ class WorkflowInstance(models.Model):
 
         if node_type == "end_event":
             self._complete_node_runtime(node_runtime)
-            self._consume_token(token)
+            token._consume()
             final_state = self._normalize_final_state(node_spec)
             self._transition_state(final_state)
             self._dispatch_post_commit(
@@ -532,23 +532,9 @@ class WorkflowInstance(models.Model):
             )
             return True
 
-        if node_type == "parallel_gateway":
-            raise WorkflowConfigurationError(
-                _("Parallel gateway runtime requires dedicated token/join semantics and is not enabled in TASK-P3-001.")
-            )
-
-        if node_type not in {"start_event", "exclusive_gateway"}:
+        if node_type not in {"start_event", "exclusive_gateway", "parallel_gateway"}:
             raise WorkflowConfigurationError(_("Unsupported runtime node type '%s'.") % node_type)
-
-        outgoing_paths = self._resolve_outgoing_paths(runtime_artifact, node_spec, target_record, binding_context)
-        if not outgoing_paths:
-            raise WorkflowRuntimeError(_("Runtime node '%s' has no reachable outgoing path.") % node_spec["id"])
-
-        self._complete_node_runtime(node_runtime)
-        self._consume_token(token)
-        for path in outgoing_paths:
-            self._activate_path(token, runtime_artifact, path)
-        return True
+        return bool(token._advance(runtime_artifact, target_record=target_record, binding_context=binding_context))
 
     def _resolve_outgoing_paths(self, runtime_artifact, node_spec, target_record, binding_context):
         """Resolve the next runtime path or paths for the current node."""
