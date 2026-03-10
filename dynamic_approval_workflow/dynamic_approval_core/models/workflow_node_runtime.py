@@ -13,6 +13,7 @@ class WorkflowNodeRuntime(models.Model):
     _order = "instance_id, sequence"
     _default_loop_iteration_cap = 5
     _max_loop_iteration = 99
+    _immutable_identity_fields = {"instance_id", "node_id", "node_type", "loop_iteration"}
     _node_type_selection = [
         ("start_event", "Start Event"),
         ("end_event", "End Event"),
@@ -129,6 +130,10 @@ class WorkflowNodeRuntime(models.Model):
     def write(self, vals):
         """Apply the documented node state machine and managed timestamps."""
         vals = dict(vals)
+        attempted_identity_updates = self._immutable_identity_fields.intersection(vals)
+        if attempted_identity_updates:
+            raise ValidationError(_("Workflow node runtime identity fields are immutable after creation."))
+
         provided_timestamp_fields = self._managed_timestamp_fields.intersection(vals)
         if provided_timestamp_fields and "state" not in vals:
             raise ValidationError(

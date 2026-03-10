@@ -132,6 +132,13 @@ class TestWorkflowNodeRuntime(TransactionCase):
         with self.assertRaises(ValidationError, msg="Managed timestamps should reject manual writes."):
             node_runtime.write({"activated_at_utc": "2026-03-10 00:00:00"})
 
+    def test_write_rejects_identity_field_mutation(self):
+        """DFR-04-014: node runtime identity fields must remain immutable."""
+        node_runtime = self._create_node_runtime()
+
+        with self.assertRaises(ValidationError, msg="Node runtime identity fields should reject writes."):
+            node_runtime.write({"node_id": "Activity_2"})
+
     def test_cron_discover_expired_timers_is_safe_no_op_without_deadline_fields(self):
         """FR-021: timer discovery should remain idempotent until timer metadata exists."""
         self._create_node_runtime(node_id="Timer_1", node_type="timer_event")
