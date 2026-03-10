@@ -38,7 +38,7 @@
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <button name="%(dynamic_approval_core.workflow_instance_action)d"
+                        <button name="%(dynamic_approval_core.action_workflow_instance)d"
                                 type="action"
                                 class="oe_stat_button"
                                 icon="fa-sitemap"

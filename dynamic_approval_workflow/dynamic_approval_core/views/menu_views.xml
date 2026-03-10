@@ -31,7 +31,7 @@
     <menuitem id="menu_workflow_instances"
               name="Instances"
               parent="menu_workflow_root"
-              action="workflow_instance_action"
+              action="action_workflow_instance"
               groups="dynamic_approval_core.group_workflow_approver"
               sequence="40"/>
 
