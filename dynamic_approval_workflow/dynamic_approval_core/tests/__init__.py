@@ -15,3 +15,4 @@ from . import (
 from . import test_workflow_incident as test_workflow_incident
 from . import test_workflow_approval_mixin as test_workflow_approval_mixin
 from . import test_workflow_cron as test_workflow_cron
+from . import test_workflow_node_runtime as test_workflow_node_runtime
