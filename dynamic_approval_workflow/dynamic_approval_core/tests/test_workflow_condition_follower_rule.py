@@ -1,6 +1,7 @@
 import json
 
-from odoo.exceptions import ValidationError
+from odoo import fields
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
@@ -12,6 +13,21 @@ class TestWorkflowConditionFollowerRule(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.group_designer = cls.env.ref("dynamic_approval_core.group_workflow_designer")
+        cls.designer_user = (
+            cls.env["res.users"]
+            .with_context(no_reset_password=True)
+            .create(
+                {
+                    "name": "Condition Designer",
+                    "login": "condition_designer@example.com",
+                    "email": "condition_designer@example.com",
+                    "group_ids": [(6, 0, [cls.group_designer.id])],
+                    "company_id": cls.env.company.id,
+                    "company_ids": [(6, 0, [cls.env.company.id])],
+                }
+            )
+        )
         cls.definition = cls.env["workflow.definition"].create(
             {
                 "name": "Condition Workflow",
@@ -71,6 +87,55 @@ class TestWorkflowConditionFollowerRule(TransactionCase):
             }
         )
         self.assertTrue(python_rule, "Python rule should be created with valid python_code")
+
+    def test_condition_rule_python_is_admin_only(self):
+        with self.assertRaises(AccessError):
+            self.env["workflow.condition.rule"].with_user(self.designer_user).create(
+                {
+                    "name": "Designer Python",
+                    "definition_version_id": self.version.id,
+                    "source_node_id": "Gateway_P",
+                    "target_node_id": "Task_P",
+                    "condition_type": "python",
+                    "python_code": "True",
+                }
+            )
+
+    def test_condition_rule_published_version_is_immutable(self):
+        version = self.env["workflow.definition.version"].create(
+            {
+                "definition_id": self.definition.id,
+                "bpmn_xml": "<xml/>",
+                "effective_from_utc": fields.Datetime.now(),
+            }
+        )
+        rule = self.env["workflow.condition.rule"].create(
+            {
+                "name": "Published Rule",
+                "definition_version_id": version.id,
+                "source_node_id": "Gateway_IMM",
+                "target_node_id": "Task_IMM",
+                "condition_type": "domain",
+                "domain_filter": json.dumps([["name", "=", "X"]]),
+            }
+        )
+        version.action_publish()
+
+        with self.assertRaises(ValidationError):
+            rule.write({"name": "Changed"})
+        with self.assertRaises(ValidationError):
+            self.env["workflow.condition.rule"].create(
+                {
+                    "name": "Late Rule",
+                    "definition_version_id": version.id,
+                    "source_node_id": "Gateway_IMM",
+                    "target_node_id": "Task_OTHER",
+                    "condition_type": "domain",
+                    "domain_filter": json.dumps([["name", "=", "Y"]]),
+                }
+            )
+        with self.assertRaises(ValidationError):
+            rule.unlink()
 
     def test_condition_rule_domain_filter_must_be_json_list(self):
         with self.assertRaises(ValidationError):

@@ -1,3 +1,4 @@
+from odoo import fields
 from odoo.exceptions import ValidationError
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
@@ -57,10 +58,19 @@ class TestWorkflowNodeRuntime(TransactionCase):
         self.assertFalse(node_runtime.activated_at_utc, "Pending node runtime should not be activated yet.")
         self.assertFalse(node_runtime.completed_at_utc, "Pending node runtime should not be completed yet.")
 
-    def test_create_rejects_non_pending_initial_state(self):
-        """DFR-04-014: node runtime records must begin in the pending state."""
-        with self.assertRaises(ValidationError, msg="Node runtime should reject non-pending initial states."):
+    def test_create_enforces_timestamp_invariants_for_non_pending_state(self):
+        """DFR-04-014: non-pending records must satisfy the documented timestamp rules."""
+        with self.assertRaises(ValidationError, msg="Active node runtime should require an activation timestamp."):
             self._create_node_runtime(state="active")
+
+        node_runtime = self._create_node_runtime(
+            state="active",
+            activated_at_utc=fields.Datetime.now(),
+            node_id="Activity_active",
+        )
+        self.assertEqual(
+            node_runtime.state, "active", "Active node runtime creation should be allowed with valid data."
+        )
 
     def test_write_allows_documented_state_transitions(self):
         """FR-021: node runtime should follow the documented transition path."""

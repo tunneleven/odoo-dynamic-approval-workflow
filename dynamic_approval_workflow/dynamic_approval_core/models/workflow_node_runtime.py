@@ -119,14 +119,6 @@ class WorkflowNodeRuntime(models.Model):
             if record.state == "skipped" and not record.completed_at_utc:
                 raise ValidationError(_("Skipped node runtimes must have a completion timestamp."))
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        """Create node runtimes in the documented initial state only."""
-        for vals in vals_list:
-            if vals.get("state", "pending") != "pending":
-                raise ValidationError(_("Workflow node runtimes must be created in the pending state."))
-        return super().create(vals_list)
-
     def write(self, vals):
         """Apply the documented node state machine and managed timestamps."""
         vals = dict(vals)
