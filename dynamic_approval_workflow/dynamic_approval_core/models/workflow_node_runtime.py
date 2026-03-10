@@ -38,14 +38,15 @@ class WorkflowNodeRuntime(models.Model):
             ("pending", "Pending"),
             ("active", "Active"),
             ("completed", "Completed"),
-            ("cancelled", "Cancelled"),
-            ("error", "Error"),
+            ("timed_out", "Timed Out"),
+            ("skipped", "Skipped"),
         ],
         default="pending",
         required=True,
         index=True,
     )
     sequence = fields.Integer(default=10)
+    loop_iteration = fields.Integer(default=1, readonly=True)
     activated_at_utc = fields.Datetime()
     completed_at_utc = fields.Datetime()
     company_id = fields.Many2one(
