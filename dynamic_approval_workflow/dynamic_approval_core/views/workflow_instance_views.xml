@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ======== Tree ======== -->
-    <record id="workflow_instance_view_list" model="ir.ui.view">
+    <!-- ======== List View ======== -->
+    <record id="view_workflow_instance_list" model="ir.ui.view">
         <field name="name">workflow.instance.list</field>
         <field name="model">workflow.instance</field>
         <field name="arch" type="xml">
@@ -10,53 +10,129 @@
                 <field name="name"/>
                 <field name="definition_id"/>
                 <field name="state"
-                       decoration-success="state == 'completed_approved'"
-                       decoration-danger="state in ('completed_rejected', 'error_incident')"
-                       decoration-warning="state == 'cancelled'"
+                       decoration-success="state in ('completed_approved',)"
+                       decoration-danger="state in ('completed_rejected','error_incident')"
+                       decoration-warning="state == 'waiting_human'"
                        widget="badge"/>
                 <field name="requester_id"/>
                 <field name="started_at_utc"/>
-                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="company_id" optional="hide"
+                       groups="base.group_multi_company"/>
             </list>
         </field>
     </record>
 
-    <!-- ======== Form ======== -->
-    <record id="workflow_instance_view_form" model="ir.ui.view">
+    <!-- ======== Form View ======== -->
+    <record id="view_workflow_instance_form" model="ir.ui.view">
         <field name="name">workflow.instance.form</field>
         <field name="model">workflow.instance</field>
+        <field name="priority">10</field>
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_cancel"
+                            string="Cancel"
+                            type="object"
+                            invisible="state in ('completed_approved','completed_rejected','cancelled','error_incident')"
+                            confirm="Are you sure you want to cancel this workflow instance?"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="running,waiting_human,completed_approved"/>
                 </header>
                 <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(dynamic_approval_core.action_workflow_instance_tasks)d"
+                                type="action"
+                                class="oe_stat_button"
+                                icon="fa-tasks">
+                            <field name="task_ids" widget="statinfo"
+                                   string="Tasks"/>
+                        </button>
+                    </div>
                     <group>
-                        <group>
+                        <group string="Workflow">
                             <field name="definition_id"/>
                             <field name="definition_version_id"/>
-                            <field name="requester_id"/>
+                            <field name="state"/>
                         </group>
-                        <group>
+                        <group string="Record">
                             <field name="res_model"/>
                             <field name="res_id"/>
-                            <field name="correlation_id"/>
-                            <field name="company_id" groups="base.group_multi_company"/>
+                            <field name="requester_id"/>
+                            <field name="company_id"
+                                   groups="base.group_multi_company"/>
                         </group>
                     </group>
-                    <group>
+                    <group string="Timestamps">
                         <field name="started_at_utc"/>
                         <field name="ended_at_utc"/>
+                        <field name="correlation_id"/>
                     </group>
+                    <notebook>
+                        <page string="Tokens" name="page_tokens">
+                            <field name="token_ids">
+                                <list>
+                                    <field name="state"/>
+                                    <field name="node_runtime_id"/>
+                                    <field name="branch_type"/>
+                                    <field name="parent_token_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Node Runtimes" name="page_node_runtimes">
+                            <field name="node_runtime_ids">
+                                <list>
+                                    <field name="node_id"/>
+                                    <field name="node_type"/>
+                                    <field name="state"/>
+                                    <field name="loop_iteration"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Decision Events" name="page_decision_events">
+                            <field name="decision_event_ids">
+                                <list>
+                                    <field name="decision"/>
+                                    <field name="actor_id"/>
+                                    <field name="occurred_at_utc"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
                 <chatter/>
             </form>
         </field>
     </record>
 
+    <!-- ======== Search View ======== -->
+    <record id="view_workflow_instance_search" model="ir.ui.view">
+        <field name="name">workflow.instance.search</field>
+        <field name="model">workflow.instance</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="definition_id"/>
+                <field name="requester_id"/>
+                <field name="state"/>
+                <separator/>
+                <filter name="filter_running" string="Running"
+                        domain="[('state','in',['running','waiting_human','waiting_timer'])]"/>
+                <filter name="filter_completed" string="Completed"
+                        domain="[('state','in',['completed_approved','completed_rejected'])]"/>
+                <filter name="filter_errors" string="Errors"
+                        domain="[('state','=','error_incident')]"/>
+                <separator/>
+                <filter name="groupby_state" string="By State"
+                        context="{'group_by': 'state'}"/>
+                <filter name="groupby_definition" string="By Definition"
+                        context="{'group_by': 'definition_id'}"/>
+            </search>
+        </field>
+    </record>
+
     <!-- ======== Action ======== -->
-    <record id="workflow_instance_action" model="ir.actions.act_window">
+    <record id="action_workflow_instance" model="ir.actions.act_window">
         <field name="name">Workflow Instances</field>
         <field name="res_model">workflow.instance</field>
         <field name="view_mode">list,form</field>
@@ -65,6 +141,14 @@
                 No workflow instances yet
             </p>
         </field>
+    </record>
+
+    <!-- Stat-button action: tasks linked to an instance -->
+    <record id="action_workflow_instance_tasks" model="ir.actions.act_window">
+        <field name="name">Tasks</field>
+        <field name="res_model">workflow.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('instance_id', '=', active_id)]</field>
     </record>
 
 </odoo>
