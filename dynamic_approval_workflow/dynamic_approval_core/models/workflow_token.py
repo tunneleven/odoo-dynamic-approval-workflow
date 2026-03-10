@@ -26,7 +26,7 @@ class WorkflowToken(models.Model):
         "cancelled": set(),
     }
     _managed_timestamp_fields = {"consumed_at_utc"}
-    _immutable_identity_fields = {"instance_id", "parent_token_id"}
+    _immutable_identity_fields = {"instance_id", "parent_token_id", "branch_id"}
 
     instance_id = fields.Many2one(
         "workflow.instance",
@@ -120,7 +120,7 @@ class WorkflowToken(models.Model):
             )
 
         state = vals.get("state")
-        if not state:
+        if state is None:
             return super().write(vals)
 
         same_state_records = self.filtered(lambda r: r.state == state)
@@ -166,6 +166,10 @@ class WorkflowToken(models.Model):
                 raise ValidationError(
                     _("Active tokens cannot have a consumption timestamp.")
                 )
+            if record.state == "cancelled" and record.consumed_at_utc:
+                raise ValidationError(
+                    _("Cancelled tokens cannot have a consumption timestamp.")
+                )
 
     @api.constrains("state", "cancel_reason")
     def _check_cancel_reason(self):
@@ -207,6 +211,10 @@ class WorkflowToken(models.Model):
         :returns: newly created child token at the target node.
         """
         self.ensure_one()
+        if target_node_runtime.instance_id != self.instance_id:
+            raise WorkflowRuntimeError(
+                _("Target node runtime belongs to a different workflow instance.")
+            )
         self._consume()
         return self.create({
             "instance_id": self.instance_id.id,
@@ -229,6 +237,13 @@ class WorkflowToken(models.Model):
         if not target_node_runtimes:
             raise WorkflowRuntimeError(
                 _("Parallel fork requires at least one target node runtime.")
+            )
+        mismatched = target_node_runtimes.filtered(
+            lambda nr: nr.instance_id != self.instance_id
+        )
+        if mismatched:
+            raise WorkflowRuntimeError(
+                _("Target node runtime belongs to a different workflow instance.")
             )
         self._consume()
         branch_prefix = uuid.uuid4().hex[:16]
@@ -256,6 +271,11 @@ class WorkflowToken(models.Model):
         :returns: ``True`` if the join condition is satisfied and the
             caller should proceed with downstream activation.
             ``False`` if the token must wait for more siblings.
+
+        .. warning::
+            Callers must hold the per-instance ``pg_advisory_xact_lock``
+            (SDS §6.4) before invoking this method to prevent concurrent
+            double-trigger in multi-worker deployments.
         """
         self.ensure_one()
         if self.state != "active":
@@ -267,27 +287,34 @@ class WorkflowToken(models.Model):
             ("parent_token_id", "=", self.parent_token_id.id),
             ("id", "!=", self.id),
         ])
-        total_branch_count = len(siblings) + 1
 
         if join_type == "any":
             self._cancel_remaining_siblings(siblings)
             return True
 
         if join_type == "quorum":
+            # Exclude already-cancelled siblings from denominator to avoid
+            # livelock when branches were cancelled upstream.
+            live_siblings = siblings.filtered(lambda t: t.state != "cancelled")
+            live_branch_count = len(live_siblings) + 1  # +1 for self (arriving)
             effective_threshold = (
-                quorum_threshold if quorum_threshold is not None else total_branch_count
+                quorum_threshold if quorum_threshold is not None else live_branch_count
             )
             arrived_count = len(
                 siblings.filtered(lambda t: t.state == "consumed")
-            ) + 1
+            ) + 1  # +1 for self (arriving, still active)
             if arrived_count >= effective_threshold:
                 self._cancel_remaining_siblings(siblings)
                 return True
             return False
 
-        # Default: "all" — every sibling must be consumed
-        active_siblings = siblings.filtered(lambda t: t.state == "active")
-        return not active_siblings
+        # Default: "all" — every live sibling must be consumed.
+        # Cancelled siblings are treated as "done" to prevent livelock
+        # when branches were cancelled upstream or by a prior join.
+        pending_siblings = siblings.filtered(
+            lambda t: t.state not in ("consumed", "cancelled")
+        )
+        return not pending_siblings
 
     def _cancel_remaining_siblings(self, siblings):
         """Cancel active sibling tokens that are superseded by the join."""
