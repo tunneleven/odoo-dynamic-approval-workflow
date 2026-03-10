@@ -109,8 +109,8 @@ class TestWorkflowNodeRuntime(TransactionCase):
         with self.assertRaises(ValidationError, msg="Loop iteration should reject values below 1."):
             self._create_node_runtime(loop_iteration=0)
 
+        self.env["ir.config_parameter"].set_param("daw.rework_max_loops", "99")
         with self.assertRaises(ValidationError, msg="Loop iteration should reject values above 99."):
-            self.env["ir.config_parameter"].set_param("daw.rework_max_loops", "99")
             self._create_node_runtime(loop_iteration=100)
 
     def test_write_same_state_does_not_restamp_timestamps(self):
@@ -141,6 +141,41 @@ class TestWorkflowNodeRuntime(TransactionCase):
 
         with self.assertRaises(ValidationError, msg="Managed timestamps should reject manual writes."):
             node_runtime.write({"activated_at_utc": "2026-03-10 00:00:00"})
+
+        with self.assertRaises(
+            ValidationError,
+            msg="Managed timestamps should reject writes even when a valid state transition is requested.",
+        ):
+            node_runtime.write(
+                {
+                    "state": "active",
+                    "activated_at_utc": "2026-03-10 00:00:00",
+                }
+            )
+
+        node_runtime.write({"state": "active"})
+
+        with self.assertRaises(
+            ValidationError,
+            msg="Managed activation timestamp should reject writes on same-state updates.",
+        ):
+            node_runtime.write(
+                {
+                    "state": "active",
+                    "activated_at_utc": "2026-03-10 00:00:00",
+                }
+            )
+
+        with self.assertRaises(
+            ValidationError,
+            msg="Managed completion timestamp should reject writes on state transitions.",
+        ):
+            node_runtime.write(
+                {
+                    "state": "completed",
+                    "completed_at_utc": "2026-03-10 01:00:00",
+                }
+            )
 
     def test_write_rejects_identity_field_mutation(self):
         """DFR-04-014: node runtime identity fields must remain immutable."""

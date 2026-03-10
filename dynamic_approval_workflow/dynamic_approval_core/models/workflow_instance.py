@@ -757,7 +757,6 @@ class WorkflowInstance(models.Model):
         node_runtime.write(
             {
                 "state": "completed",
-                "completed_at_utc": fields.Datetime.now(),
             }
         )
 
@@ -801,7 +800,7 @@ class WorkflowInstance(models.Model):
             ]
         )
         if active_runtimes:
-            active_runtimes.write({"state": "skipped", "completed_at_utc": fields.Datetime.now()})
+            active_runtimes.write({"state": "skipped"})
 
     def _handle_tick_failure(self, err):
         """Persist the incident state after an engine failure."""

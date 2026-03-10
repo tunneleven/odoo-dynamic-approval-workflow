@@ -95,8 +95,8 @@ class WorkflowNodeRuntime(models.Model):
     @api.constrains("loop_iteration")
     def _check_loop_iteration(self):
         """Validate the rework loop counter stays within the documented range."""
+        loop_iteration_cap = self._get_loop_iteration_cap()
         for record in self:
-            loop_iteration_cap = record._get_loop_iteration_cap()
             if record.loop_iteration < 1 or record.loop_iteration > loop_iteration_cap:
                 raise ValidationError(_("Loop Iteration must be between 1 and %s.") % loop_iteration_cap)
 
@@ -127,12 +127,10 @@ class WorkflowNodeRuntime(models.Model):
             raise ValidationError(_("Workflow node runtime identity fields are immutable after creation."))
 
         provided_timestamp_fields = self._managed_timestamp_fields.intersection(vals)
-        if provided_timestamp_fields and "state" not in vals:
+        if provided_timestamp_fields:
             raise ValidationError(
                 _("Activation and completion timestamps are managed by workflow node state transitions.")
             )
-        for field_name in self._managed_timestamp_fields:
-            vals.pop(field_name, None)
 
         state = vals.get("state")
         if not state:
@@ -146,6 +144,8 @@ class WorkflowNodeRuntime(models.Model):
             same_state_vals = {key: value for key, value in vals.items() if key != "state"}
             if same_state_vals:
                 result = super(WorkflowNodeRuntime, same_state_records).write(same_state_vals) and result
+            else:
+                result = super(WorkflowNodeRuntime, same_state_records).write({}) and result
 
         if transition_records:
             transition_records._validate_state_transition(state)
