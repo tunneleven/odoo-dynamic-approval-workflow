@@ -11,6 +11,7 @@ class WorkflowNodeRuntime(models.Model):
     _name = "workflow.node.runtime"
     _description = "Workflow Node Runtime"
     _order = "instance_id, sequence"
+    _default_loop_iteration_cap = 5
     _max_loop_iteration = 99
     _node_type_selection = [
         ("start_event", "Start Event"),
@@ -28,6 +29,7 @@ class WorkflowNodeRuntime(models.Model):
         ("skipped", "Skipped"),
     ]
     _terminal_states = {"completed", "timed_out", "skipped"}
+    _managed_timestamp_fields = {"activated_at_utc", "completed_at_utc"}
     _allowed_state_transitions = {
         "pending": {"active", "skipped"},
         "active": {"completed", "timed_out", "skipped"},
@@ -93,8 +95,9 @@ class WorkflowNodeRuntime(models.Model):
     def _check_loop_iteration(self):
         """Validate the rework loop counter stays within the documented range."""
         for record in self:
-            if record.loop_iteration < 1 or record.loop_iteration > self._max_loop_iteration:
-                raise ValidationError(_("Loop Iteration must be between 1 and %s.") % self._max_loop_iteration)
+            loop_iteration_cap = record._get_loop_iteration_cap()
+            if record.loop_iteration < 1 or record.loop_iteration > loop_iteration_cap:
+                raise ValidationError(_("Loop Iteration must be between 1 and %s.") % loop_iteration_cap)
 
     @api.constrains("state", "activated_at_utc", "completed_at_utc")
     def _check_state_timestamps(self):
@@ -125,6 +128,15 @@ class WorkflowNodeRuntime(models.Model):
 
     def write(self, vals):
         """Apply the documented node state machine and managed timestamps."""
+        vals = dict(vals)
+        provided_timestamp_fields = self._managed_timestamp_fields.intersection(vals)
+        if provided_timestamp_fields and "state" not in vals:
+            raise ValidationError(
+                _("Activation and completion timestamps are managed by workflow node state transitions.")
+            )
+        for field_name in self._managed_timestamp_fields:
+            vals.pop(field_name, None)
+
         state = vals.get("state")
         if not state:
             return super().write(vals)
@@ -161,6 +173,24 @@ class WorkflowNodeRuntime(models.Model):
                 raise ValidationError(
                     _("Invalid node runtime transition from '%s' to '%s'.") % (current_state, next_state)
                 )
+
+    @api.model
+    def _get_loop_iteration_cap(self):
+        """Return the effective rework loop cap from global configuration."""
+        config_value = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param(
+                "daw.rework_max_loops",
+                default=str(self._default_loop_iteration_cap),
+            )
+        )
+        try:
+            loop_iteration_cap = int(config_value)
+        except (TypeError, ValueError):
+            loop_iteration_cap = self._default_loop_iteration_cap
+
+        return max(1, min(loop_iteration_cap, self._max_loop_iteration))
 
     @api.model
     def _cron_discover_expired_timers(self):

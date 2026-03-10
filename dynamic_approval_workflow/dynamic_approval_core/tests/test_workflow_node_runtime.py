@@ -82,12 +82,25 @@ class TestWorkflowNodeRuntime(TransactionCase):
         with self.assertRaises(ValidationError, msg="Pending node runtime must not jump directly to completed."):
             node_runtime.write({"state": "completed"})
 
-    def test_loop_iteration_respects_documented_range(self):
+    def test_loop_iteration_uses_default_and_configured_cap(self):
+        """DFR-04-005: loop iteration must honor the default and configured caps."""
+        with self.assertRaises(ValidationError, msg="Default loop cap should reject values above 5."):
+            self._create_node_runtime(loop_iteration=6)
+
+        self.env["ir.config_parameter"].set_param("daw.rework_max_loops", "6")
+        node_runtime = self._create_node_runtime(loop_iteration=6, node_id="Activity_6")
+        self.assertEqual(node_runtime.loop_iteration, 6, "Configured loop cap should allow iteration 6.")
+
+        with self.assertRaises(ValidationError, msg="Configured loop cap should reject values above 6."):
+            self._create_node_runtime(loop_iteration=7, node_id="Activity_7")
+
+    def test_loop_iteration_rejects_out_of_range_values(self):
         """DFR-04-005: loop iteration must stay within the documented numeric range."""
         with self.assertRaises(ValidationError, msg="Loop iteration should reject values below 1."):
             self._create_node_runtime(loop_iteration=0)
 
         with self.assertRaises(ValidationError, msg="Loop iteration should reject values above 99."):
+            self.env["ir.config_parameter"].set_param("daw.rework_max_loops", "99")
             self._create_node_runtime(loop_iteration=100)
 
     def test_write_same_state_does_not_restamp_timestamps(self):
@@ -111,6 +124,13 @@ class TestWorkflowNodeRuntime(TransactionCase):
             completed_at,
             "Same-state terminal writes must not restamp the completion timestamp.",
         )
+
+    def test_write_rejects_manual_timestamp_mutation(self):
+        """DFR-04-014: managed timestamps must not be caller-writable."""
+        node_runtime = self._create_node_runtime()
+
+        with self.assertRaises(ValidationError, msg="Managed timestamps should reject manual writes."):
+            node_runtime.write({"activated_at_utc": "2026-03-10 00:00:00"})
 
     def test_cron_discover_expired_timers_is_safe_no_op_without_deadline_fields(self):
         """FR-021: timer discovery should remain idempotent until timer metadata exists."""
