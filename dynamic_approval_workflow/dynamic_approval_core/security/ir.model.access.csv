@@ -26,10 +26,11 @@ access_workflow_instance_admin,workflow.instance.admin,model_workflow_instance,g
 access_workflow_instance_auditor,workflow.instance.auditor,model_workflow_instance,group_workflow_auditor,1,0,0,0
 access_workflow_node_runtime_approver,workflow.node.runtime.approver,model_workflow_node_runtime,group_workflow_approver,1,0,0,0
 access_workflow_node_runtime_admin,workflow.node.runtime.admin,model_workflow_node_runtime,group_workflow_admin,1,1,1,1
-access_workflow_token_admin,workflow.token.admin,model_workflow_token,group_workflow_admin,1,1,1,1
+access_workflow_node_runtime_auditor,workflow.node.runtime.auditor,model_workflow_node_runtime,group_workflow_auditor,1,0,0,0
+access_workflow_token_admin,workflow.token.admin,model_workflow_token,group_workflow_admin,1,1,1,0
 access_workflow_token_auditor,workflow.token.auditor,model_workflow_token,group_workflow_auditor,1,0,0,0
 access_workflow_decision_event_approver,workflow.decision.event.approver,model_workflow_decision_event,group_workflow_approver,1,0,1,0
-access_workflow_decision_event_admin,workflow.decision.event.admin,model_workflow_decision_event,group_workflow_admin,1,1,1,1
+access_workflow_decision_event_admin,workflow.decision.event.admin,model_workflow_decision_event,group_workflow_admin,1,1,1,0
 access_workflow_decision_event_auditor,workflow.decision.event.auditor,model_workflow_decision_event,group_workflow_auditor,1,0,0,0
 access_workflow_task_approver,workflow.task.approver,model_workflow_task,group_workflow_approver,1,1,0,0
 access_workflow_task_designer,workflow.task.designer,model_workflow_task,group_workflow_designer,1,1,0,0
