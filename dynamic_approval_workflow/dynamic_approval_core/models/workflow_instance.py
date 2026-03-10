@@ -518,6 +518,8 @@ class WorkflowInstance(models.Model):
         if node_type == "end_event":
             self._complete_node_runtime(node_runtime)
             token._consume()
+            if self._has_active_runtime():
+                return True
             final_state = self._normalize_final_state(node_spec)
             self._transition_state(final_state)
             self._dispatch_post_commit(

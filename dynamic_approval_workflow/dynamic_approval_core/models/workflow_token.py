@@ -96,6 +96,8 @@ class WorkflowToken(models.Model):
             outgoing_paths = instance._get_outgoing_paths(runtime_artifact, node_spec)
             if self._is_join_gateway(node_spec, outgoing_paths):
                 return self._join(runtime_artifact, node_spec=node_spec, outgoing_paths=outgoing_paths)
+            if not outgoing_paths:
+                raise WorkflowRuntimeError(_("Runtime node '%s' has no reachable outgoing path.") % node_spec["id"])
             instance._complete_node_runtime(self.node_runtime_id)
             self._consume(runtime_artifact=runtime_artifact, outgoing_paths=outgoing_paths)
             return True
@@ -232,19 +234,32 @@ class WorkflowToken(models.Model):
         """Return whether the current parallel gateway behaves as a join."""
         self.ensure_one()
         incoming = node_spec.get("incoming") or node_spec.get("incoming_paths") or node_spec.get("incoming_branches")
-        if isinstance(incoming, list):
-            incoming_count = len(incoming)
-        else:
-            incoming_count = node_spec.get("incoming_count") or incoming or 0
+        incoming_count = self._get_incoming_count(node_spec, incoming)
 
         gateway_direction = str(node_spec.get("gateway_direction") or node_spec.get("direction") or "").lower()
         if node_spec.get("join_mode") or node_spec.get("quorum_mode"):
             return True
         if gateway_direction in {"converging", "mixed"}:
             return True
-        if incoming_count and int(incoming_count) > 1:
+        if incoming_count > 1:
             return True
         return bool(self.branch_id and len(outgoing_paths) <= 1 and self._get_split_parent_token())
+
+    def _get_incoming_count(self, node_spec, incoming=None):
+        """Return a safe incoming-branch count for join heuristics."""
+        self.ensure_one()
+        if isinstance(incoming, list):
+            return len(incoming)
+        if isinstance(incoming, int):
+            return max(incoming, 0)
+        if isinstance(incoming, str):
+            return 1 if incoming else 0
+
+        raw_count = node_spec.get("incoming_count") or 0
+        try:
+            return max(int(raw_count), 0)
+        except (TypeError, ValueError):
+            return 0
 
     def _get_split_parent_token(self):
         """Return the token that existed before the current branch group split."""
@@ -309,15 +324,20 @@ class WorkflowToken(models.Model):
         if not tokens:
             return
 
-        runtime_ids = tokens.mapped("node_runtime_id").ids
-        tokens.write(
+        subtree_tokens = self._collect_descendant_tokens(tokens)
+        active_subtree_tokens = subtree_tokens.filtered(lambda token: token.state == "active")
+        if not active_subtree_tokens:
+            return
+
+        runtime_ids = active_subtree_tokens.mapped("node_runtime_id").ids
+        active_subtree_tokens.write(
             {
                 "state": "cancelled",
                 "cancel_reason": "branch_superseded",
             }
         )
 
-        node_runtimes = tokens.mapped("node_runtime_id").filtered(
+        node_runtimes = active_subtree_tokens.mapped("node_runtime_id").filtered(
             lambda runtime: runtime.state in {"pending", "active"}
         )
         if node_runtimes:
@@ -333,3 +353,12 @@ class WorkflowToken(models.Model):
             )
             if open_tasks:
                 open_tasks.write({"status": "cancelled"})
+
+    def _collect_descendant_tokens(self, tokens):
+        """Return the supplied tokens plus every descendant in their lineage."""
+        descendant_tokens = tokens
+        frontier = tokens
+        while frontier:
+            frontier = self.env["workflow.token"].search([("parent_token_id", "in", frontier.ids)])
+            descendant_tokens |= frontier
+        return descendant_tokens

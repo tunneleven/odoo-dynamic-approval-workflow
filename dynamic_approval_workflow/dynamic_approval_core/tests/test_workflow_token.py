@@ -2,7 +2,7 @@ from odoo import fields
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
-from ..exceptions import WorkflowError
+from ..exceptions import WorkflowError, WorkflowRuntimeError
 
 
 @tagged("post_install", "-at_install")
@@ -120,6 +120,53 @@ class TestWorkflowToken(TransactionCase):
             "Forked child tokens should point at the expected downstream nodes.",
         )
 
+    def test_parallel_split_tolerates_string_incoming_flow_identifier(self):
+        """FR-022: BPMN-style incoming flow IDs should not be misread as join counts."""
+        instance = self._create_instance()
+        split_runtime = self._create_node_runtime(instance, "Gateway_StringIncoming", "parallel_gateway")
+        token = self._create_token(instance, node_runtime=split_runtime)
+        runtime_artifact = {
+            "nodes": [
+                {
+                    "id": "Gateway_StringIncoming",
+                    "type": "parallel_gateway",
+                    "incoming": "Flow_1",
+                    "outgoing": ["Task_A", "Task_B"],
+                },
+                {"id": "Task_A", "type": "user_task"},
+                {"id": "Task_B", "type": "user_task"},
+            ]
+        }
+
+        token._advance(runtime_artifact)
+
+        self.assertEqual(
+            self.env["workflow.token"].search_count([("parent_token_id", "=", token.id), ("state", "=", "active")]),
+            2,
+            "A single incoming flow ID should still be treated as a split and create both branch tokens.",
+        )
+
+    def test_advance_parallel_gateway_without_outgoing_paths_raises_error(self):
+        """FR-022: misconfigured parallel splits must fail closed."""
+        instance = self._create_instance()
+        split_runtime = self._create_node_runtime(instance, "Gateway_Broken", "parallel_gateway")
+        token = self._create_token(instance, node_runtime=split_runtime)
+        runtime_artifact = {
+            "nodes": [
+                {
+                    "id": "Gateway_Broken",
+                    "type": "parallel_gateway",
+                    "outgoing": [],
+                }
+            ]
+        }
+
+        with self.assertRaises(
+            WorkflowRuntimeError,
+            msg="Parallel gateways without reachable outgoing paths should raise instead of stalling silently.",
+        ):
+            token._advance(runtime_artifact)
+
     def test_join_quorum_consumes_arrivals_and_cancels_remaining_branch(self):
         """FR-022/FR-024: quorum join should merge when the threshold is reached."""
         instance = self._create_instance()
@@ -217,4 +264,95 @@ class TestWorkflowToken(TransactionCase):
         self.assertFalse(
             downstream_token.branch_id,
             "Merged downstream tokens should restore the parent branch group after the join completes.",
+        )
+
+    def test_join_quorum_cancels_nested_descendant_tokens(self):
+        """FR-024: superseded branches must cancel nested descendant work too."""
+        instance = self._create_instance()
+        split_parent = self._create_token(instance, state="consumed")
+        branch_group_id = "outer-branch-group"
+        branch_root_a = self._create_token(
+            instance, parent_token=split_parent, branch_id=branch_group_id, state="consumed"
+        )
+        branch_root_b = self._create_token(
+            instance, parent_token=split_parent, branch_id=branch_group_id, state="consumed"
+        )
+        branch_root_c = self._create_token(
+            instance, parent_token=split_parent, branch_id=branch_group_id, state="consumed"
+        )
+
+        join_runtime_a = self._create_node_runtime(instance, "Join_Outer", "parallel_gateway")
+        join_runtime_b = self._create_node_runtime(instance, "Join_Outer", "parallel_gateway")
+        nested_split_runtime = self._create_node_runtime(instance, "Gateway_Inner", "parallel_gateway")
+        nested_task_runtime = self._create_node_runtime(instance, "Task_Inner", "user_task")
+        self._create_token(
+            instance,
+            node_runtime=join_runtime_a,
+            parent_token=branch_root_a,
+            branch_id=branch_group_id,
+        )
+        join_token_b = self._create_token(
+            instance,
+            node_runtime=join_runtime_b,
+            parent_token=branch_root_b,
+            branch_id=branch_group_id,
+        )
+        nested_split_token = self._create_token(
+            instance,
+            node_runtime=nested_split_runtime,
+            parent_token=branch_root_c,
+            branch_id=branch_group_id,
+        )
+        nested_child_token = self._create_token(
+            instance,
+            node_runtime=nested_task_runtime,
+            parent_token=nested_split_token,
+            branch_id="inner-branch-group",
+        )
+        nested_task = self.env["workflow.task"].create(
+            {
+                "name": "Nested Branch Approval",
+                "instance_id": instance.id,
+                "node_runtime_id": nested_task_runtime.id,
+            }
+        )
+        runtime_artifact = {
+            "nodes": [
+                {
+                    "id": "Join_Outer",
+                    "type": "parallel_gateway",
+                    "join_mode": "quorum",
+                    "quorum_count": 2,
+                    "outgoing": ["End_Outer"],
+                },
+                {"id": "End_Outer", "type": "end_event", "final_state": "completed_approved"},
+            ]
+        }
+
+        join_token_b._advance(runtime_artifact)
+
+        self.assertEqual(
+            nested_split_token.state,
+            "cancelled",
+            "Superseded outer branches should cancel their active split tokens.",
+        )
+        self.assertEqual(
+            nested_child_token.state,
+            "cancelled",
+            "Superseded outer branches should also cancel active descendant tokens with new branch groups.",
+        )
+        self.assertEqual(
+            nested_split_runtime.state,
+            "skipped",
+            "Nested split runtimes on superseded branches should be skipped.",
+        )
+        self.assertEqual(
+            nested_task_runtime.state,
+            "skipped",
+            "Nested descendant runtimes on superseded branches should be skipped.",
+        )
+        self.assertEqual(
+            nested_task.status,
+            "cancelled",
+            "Nested open tasks on superseded branches should be cancelled.",
         )
