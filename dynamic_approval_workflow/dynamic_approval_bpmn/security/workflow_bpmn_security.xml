@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+
+    <!-- Multi-Company Record Rules (OMB-05 §5.2) -->
+
+    <record id="rule_diagram_asset_company" model="ir.rule">
+        <field name="name">Diagram Asset: multi-company</field>
+        <field name="model_id" ref="model_workflow_diagram_asset"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+    <record id="rule_validation_result_company" model="ir.rule">
+        <field name="name">Validation Result: multi-company</field>
+        <field name="model_id" ref="model_workflow_diagram_validation_result"/>
+        <field name="domain_force">
+            ['|', ('company_id', '=', False),
+                  ('company_id', 'in', company_ids)]
+        </field>
+    </record>
+
+</odoo>

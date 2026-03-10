@@ -15,6 +15,7 @@
     },
     "data": [
         "security/ir.model.access.csv",
+        "security/workflow_bpmn_security.xml",
         "views/workflow_diagram_views.xml",
         "views/menu_views.xml",
     ],
